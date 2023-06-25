@@ -129,7 +129,7 @@ It understands nil, for :same,
                  `(:next ,offset)
                `(:prev ,(- offset)))))))
 
-(defconst lit-regular-spec-regex "// \\([A-Z]+\\)\\(\\[[^]]+\\]\\)?\\( +\\)\\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
+(defconst lit-regular-spec-src-regex "// \\([A-Z]+\\)\\(\\[[^]]+\\]\\)?\\( +\\)\\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
   "Regex for CHECK, SECONDARY, and DATAFLOW specs.")
 (defconst lit-regular-spec-indices
   '( :keyword 1
@@ -138,7 +138,7 @@ It understands nil, for :same,
      :end-line-offset 6
      :end-col 7)
   "Indices of the matched regex corresponding to different semantic elements of the regular spec.")
-(defconst lit-edit-regex "// \\(EDIT\\) [^ ]+ \\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
+(defconst lit-edit-src-regex "// \\(EDIT\\) [^ ]+ \\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
   "Regex for EDIT specs")
 (defconst lit-edit-indices
   '( :keyword 1
@@ -147,7 +147,7 @@ It understands nil, for :same,
      :end-line-offset 4
      :end-col 5)
   "Indices of the matched regex corresponding to different semantic elements of the EDIT spec.")
-(defconst lit-other-spec-regex "// \\(FIX\\|DATAFLOW DESCRIPTION\\|COMMENT\\|NOEXECFLOW\\|NOFIX\\)"
+(defconst lit-other-spec-src-regex "// \\(FIX\\|DATAFLOW DESCRIPTION\\|COMMENT\\|NOEXECFLOW\\|NOFIX\\)"
   "Regex for all the specs that do not feature range to highlight.
 Needed to properly skip lines when resolving smart offsets.")
 
@@ -155,11 +155,11 @@ Needed to properly skip lines when resolving smart offsets.")
   "Match `LINE' agains all the spec regexes.
 Returns nil for no match,
   or a plist with :offset of the match and :indices where applicable."
-  (if-let ((offset (string-match lit-regular-spec-regex line)))
+  (if-let ((offset (string-match lit-regular-spec-src-regex line)))
       `(:offset ,offset :indices ,lit-regular-spec-indices)
-    (if-let ((offset (string-match lit-edit-regex line)))
+    (if-let ((offset (string-match lit-edit-src-regex line)))
         `(:offset ,offset :indices ,lit-edit-indices)
-      (if-let ((offset (string-match lit-other-spec-regex line)))
+      (if-let ((offset (string-match lit-other-spec-src-regex line)))
           `(:offset ,offset :indices nil)
         nil))))
 
@@ -323,18 +323,18 @@ and transform it to the point values :begin and :end plist."
 (make-local-variable 'lit-dumb-range-overlays)
 
 
-(defconst lit-filename-regex "^ */[^:.\"']+\\.[^:.\"']+$"
+(defconst lit-tester-filename-regex "^ */[^:.\"']+\\.[^:.\"']+$"
   "Matches the filename-only line that precedes every issue in tester output.")
 
 (defun lit-match-filename (first-line)
-  (if (string-match lit-filename-regex first-line)
+  (if (string-match lit-tester-filename-regex first-line)
       (match-string 0 first-line)
     nil))
 
-(defconst lit-primary-regex "\\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) \\([^:]+\\):\\(.*\\)")
+(defconst lit-tester-primary-regex "\\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) \\([^:]+\\):\\(.*\\)")
 
 (defun lit-parse-primary-spec (spec-line)
-  (if (string-match lit-primary-regex spec-line)
+  (if (string-match lit-tester-primary-regex spec-line)
       (let ((begin-line (string-to-number (match-string 1 spec-line)))
             (begin-col (string-to-number (match-string 2 spec-line)))
             (end-line (string-to-number (match-string 3 spec-line)))
@@ -347,12 +347,12 @@ and transform it to the point values :begin and :end plist."
                       :message ,message)))
     nil))
 
-(defconst lit-secondary-regex "\\(/[^:]+\\):    \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\):\\(.*\\)")
-(defconst lit-n-dataflows-regex "[0-9]+ data flows:")
-(defconst lit-dataflow-descr-regex "// DATAFLOW DESCRIPTION:\\(.*\\)$")
+(defconst lit-tester-secondary-regex "\\(/[^:]+\\):    \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\):\\(.*\\)")
+(defconst lit-tester-d-dataflows-regex "[0-9]+ data flows:")
+(defconst lit-tester-dataflow-descr-regex "// DATAFLOW DESCRIPTION:\\(.*\\)$")
 
 (defun lit-parse-secondary-spec (spec-line)
-  (if (string-match lit-secondary-regex spec-line)
+  (if (string-match lit-tester-secondary-regex spec-line)
       (let ((filename (match-string 1 spec-line))
             (begin-line (string-to-number (match-string 2 spec-line)))
             (begin-col (string-to-number (match-string 3 spec-line)))
@@ -373,22 +373,22 @@ and transform it to the point values :begin and :end plist."
     (dolist (line lines)
       (cl-case now-collecting
         (:secondaries
-         (if (string-match-p lit-n-dataflows-regex line)
+         (if (string-match-p lit-tester-d-dataflows-regex line)
              ;; This particular line is useless
              (setq now-collecting :dataflows)
-           (if (string-match-p lit-fix-descr-regex line)
+           (if (string-match-p lit-tester-fix-descr-regex line)
                (progn
                  (setq now-collecting :fixes)
                  (push line fix-specs))
              (push line secondary-specs))))
         (:dataflows
-         (if (string-match-p lit-fix-descr-regex line)
+         (if (string-match-p lit-tester-fix-descr-regex line)
              (progn
                (setq now-collecting :fixes)
                (push line fix-specs))
            (push line dataflow-specs)))
         (:fixes
-         (if (string-match-p lit-n-dataflows-regex line)
+         (if (string-match-p lit-tester-d-dataflows-regex line)
              ;; This particular line is useless
              (setq new-collecting :dataflows)
            (push line fix-specs)))
@@ -398,13 +398,13 @@ and transform it to the point values :begin and :end plist."
           (reverse fix-specs))))
 
 (defun lit-not-dataflow-descr (l)
-  (not (string-match-p lit-dataflow-descr-legex l)))
+  (not (string-match-p lit-tester-dataflow-descr-regex l)))
 
 (defun lit-parse-dataflows (dataflow-specs)
   (let ((dataflows '())
         (dataflow-specs dataflow-specs))
     (while dataflow-specs
-      (let ((it-is-descr (string-match lit-dataflow-descr-regex (car dataflow-specs))))
+      (let ((it-is-descr (string-match lit-tester-dataflow-descr-regex (car dataflow-specs))))
         (cl-assert it-is-descr)
         (let* ((description (match-string 1 (car dataflow-specs)))
                (step-specs (seq-take-while #'lit-not-dataflow-descr (cdr dataflow-specs)))
@@ -415,14 +415,14 @@ and transform it to the point values :begin and :end plist."
                 dataflows))))
     (reverse dataflows)))
 
-(defconst lit-fix-descr-regex "// FIX \\(.*\\)$")
-(defconst lit-edit-regex "// EDIT \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) `\\([^`]*\\)`")
+(defconst lit-tester-fix-descr-regex "// FIX \\(.*\\)$")
+(defconst lit-tester-edit-regex "// EDIT \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) `\\([^`]*\\)`")
 
 (defun lit-not-fix-descr (l)
-  (not (string-match-p lit-fix-descr-regex l)))
+  (not (string-match-p lit-tester-fix-descr-regex l)))
 
 (defun lit-parse-edit-spec (spec-line)
-  (if (string-match lit-edit-regex spec-line)
+  (if (string-match lit-tester-edit-regex spec-line)
       (let ((begin-line (string-to-number (match-string 1 spec-line)))
             (begin-col (string-to-number (match-string 2 spec-line)))
             (end-line (string-to-number (match-string 3 spec-line)))
@@ -437,7 +437,7 @@ and transform it to the point values :begin and :end plist."
   (let ((fixes '())
         (fix-specs fix-specs))
     (while fix-specs
-      (let ((it-is-descr (string-match lit-fix-descr-regex (car fix-specs))))
+      (let ((it-is-descr (string-match lit-tester-fix-descr-regex (car fix-specs))))
         (cl-assert it-is-descr)
         (let* ((description (match-string 1 (car fix-specs)))
                (edit-specs (seq-take-while #'lit-not-fix-descr (cdr fix-specs)))
@@ -501,7 +501,7 @@ Modifies MATCH DATA."
 
 (defun lit-parse-all-observed (observed-multiisue-report)
   "Parse the observed report of multiple issues as printed by tester"
-  (let* ((observed-single-reports (lit-chop-string observed-multiisue-report lit-filename-regex))
+  (let* ((observed-single-reports (lit-chop-string observed-multiisue-report lit-tester-filename-regex))
          (issue-specs (mapcar #'lit-parse-1-observed observed-single-reports)))
     ;; Make sure all issues parsed
     (dolist (issue-spec issue-specs) (cl-assert issue-spec))
@@ -1124,7 +1124,7 @@ flows, and fixes.
       (lit-insert-issue-specs (lit-render-issue-specs-dedicated-buffer issue-specs))
     (print "malformed 'unexpected' output")))
 
-(defconst lit-removable-spec-regex
+(defconst lit-removable-spec-src-regex
   " *// \\(\\(CHECK\\|FIX\\|EDIT\\|DATAFLOW\\|DATAFLOW DESCRIPTION\\|SECONDARY\\|NOEXECFLOW\\)\\(\\[.*\\]\\)? .*\\|NOFIX\\)$"
   "All the lit spec comments that should be removed when requested.
 Does not include COMMENT, because it cannot be automatically recovered from tester output.")
@@ -1134,7 +1134,7 @@ Does not include COMMENT, because it cannot be automatically recovered from test
         (case-fold-search nil))
     (atomic-change-group
       (lit-move-to-start-of-multiline)
-      (if (search-forward-regexp lit-removable-spec-regex (line-end-position) t)
+      (if (search-forward-regexp lit-removable-spec-src-regex (line-end-position) t)
           (let ((line (match-string-no-properties 0)))
             (backward-char (length line))
             (delete-region (point) (line-end-position))

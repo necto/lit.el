@@ -27,6 +27,7 @@
                  '( :begin-line-offset (:next 8) :begin-col 4 :end-line-offset (:next 13) :end-col 11
                     :keyword-begin-col 5 :keyword-end-col 9
                     :range-spec-begin-col 15 :range-spec-end-col 26))))
+
 (ert-deftest lit-move-to-start-of-multiline-test ()
   "Test moving the point to the beginning of '\'-extended chain of lines."
   (with-temp-buffer
