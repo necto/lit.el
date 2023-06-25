@@ -5,6 +5,7 @@
 
 ;;; Commentary:
 ;;; Code:
+
 (add-to-list 'load-path "..")
 (require 'lit)
 
@@ -17,20 +18,20 @@
      " s3  \\\n"
      "s4 \\ \n"
      "s5\n")
-    (goto-line 1)
-    (lit-move-to-start-of-multiline)
+    (lit--goto-line 1)
+    (lit--move-to-start-of-multiline)
     (should (equal (line-number-at-pos) 1))
-    (goto-line 2)
-    (lit-move-to-start-of-multiline)
+    (lit--goto-line 2)
+    (lit--move-to-start-of-multiline)
     (should (equal (line-number-at-pos) 2))
-    (goto-line 3)
-    (lit-move-to-start-of-multiline)
+    (lit--goto-line 3)
+    (lit--move-to-start-of-multiline)
     (should (equal (line-number-at-pos) 2))
-    (goto-line 4)
-    (lit-move-to-start-of-multiline)
+    (lit--goto-line 4)
+    (lit--move-to-start-of-multiline)
     (should (equal (line-number-at-pos) 2))
-    (goto-line 5)
-    (lit-move-to-start-of-multiline)
+    (lit--goto-line 5)
+    (lit--move-to-start-of-multiline)
     (should (equal (line-number-at-pos) 5))))
 
 (ert-deftest lit-insert-dataflows-test-nil-id ()
@@ -44,17 +45,17 @@ line 4
 ")
       (cl-letf (((symbol-function 'y-or-n-p) (lambda (prompt) t))
                 ((symbol-function 'read-answer) (lambda (&rest args) "next"))
-                (primary-overlay (lit-make-overlay 7 20 nil t)))
-        (lit-insert-dataflows (lit-generate-dataflow-overlays
-                              '(( :description "Description 1"
-                                  :steps (( :begin (:line 2 :col 12) :end (:line 2 :col 16)
-                                            :message "This buffer access overflows")))
-                                ( :description "Description 2"
-                                  :steps (( :begin (:line 4 :col 17) :end (:line 4 :col 21)
-                                            :message "This size argument overflows the buffer")))))
-                              '("included" nil)
+                (primary-overlay (lit--make-overlay 7 20 nil t)))
+        (lit--insert-dataflows (lit--generate-dataflow-overlays
+                                '(( :description "Description 1"
+                                    :steps (( :begin (:line 2 :col 12) :end (:line 2 :col 16)
+                                                     :message "This buffer access overflows")))
+                                  ( :description "Description 2"
+                                                 :steps (( :begin (:line 4 :col 17) :end (:line 4 :col 21)
+                                                                  :message "This size argument overflows the buffer")))))
+                               '("included" nil)
                                primary-overlay)
-        (lit-clear-overlay primary-overlay))
+        (lit--clear-overlay primary-overlay))
       (buffer-substring-no-properties (point-min) (point-max)))
     "
 line 2
@@ -63,6 +64,28 @@ line 3 // CHECK
 // DATAFLOW DESCRIPTION included:Description 1
 line 4
 ")))
+
+(defun lit-run-no-questions-asked (initial-buffer-content default-answer fun)
+  (with-temp-buffer
+    (insert initial-buffer-content)
+    (let ((fix-cnt 0))
+      (cl-letf (((symbol-function 'y-or-n-p) (lambda (prompt) t))
+                ((symbol-function 'read-answer) (lambda (&rest args) default-answer))
+                ((symbol-function 'read-from-minibuffer)
+                 (lambda (prompt &rest args)
+                   (cond ((string-match-p "issue id" prompt) "issue-id")
+                         ((string-match-p "id for dataflow" prompt) "df-id")
+                         ((string-match-p "id for fix" prompt) (cl-incf fix-cnt) (format "fix-id%d" fix-cnt))
+                         (t "unexpected")))))
+        (funcall fun))
+      (buffer-substring-no-properties (point-min) (point-max)))))
+
+(defun lit-run-insert-issue-spec-batch (initial-content issue-spec default-answer)
+  (lit-run-no-questions-asked initial-content default-answer (lambda () (lit-insert-issue-spec issue-spec))))
+
+(defun lit-run-insert-issue-specs-batch (initial-content issue-specs default-answer)
+  (lit-run-no-questions-asked initial-content default-answer (lambda () (lit--insert-issue-specs issue-specs))))
+
 
 (ert-deftest lit-insert-issue-spec-test-primary-only ()
   (should (equal
@@ -456,9 +479,9 @@ line 4 with some long text to get 20 column
 (ert-deftest lit-render-primary-test ()
   (with-temp-buffer
     (insert "line1\n")
-    (should (equal (lit-render-primary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
-                                         :message "Hello")
-                                      "S100")
+    (should (equal (lit--render-primary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
+                                           :message "Hello")
+                                        "S100")
                    '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
                       :message "Hello" :pos-in-list 2)))
     (should (equal (buffer-string)
@@ -466,12 +489,12 @@ line 4 with some long text to get 20 column
 
 (ert-deftest lit-render-primary-test ()
   (with-temp-buffer
-    (should (equal (lit-render-secondary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
-                                           :message "Hello"))
+    (should (equal (lit--render-secondary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
+                                             :message "Hello"))
                    '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
                       :message "Hello" :pos-in-list 1)))
-    (should (equal (lit-render-secondary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
-                                           :message "Hello"))
+    (should (equal (lit--render-secondary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
+                                             :message "Hello"))
                    '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
                       :message "Hello" :pos-in-list 2)))
     (should (equal (buffer-string)
@@ -479,16 +502,16 @@ line 4 with some long text to get 20 column
 
 (ert-deftest lit-render-dataflow-test ()
   (with-temp-buffer
-    (should (equal (lit-render-dataflow '( :description "Df1"
-                                          :steps (( :begin (:line 1 :col 2) :end (:line 3 :col 4)
-                                                    :message "df1-step1")
-                                                  ( :begin (:line 5 :col 6) :end (:line 7 :col 8)
-                                                    :message "df1-step2"))))
+    (should (equal (lit--render-dataflow '( :description "Df1"
+                                            :steps (( :begin (:line 1 :col 2) :end (:line 3 :col 4)
+                                                             :message "df1-step1")
+                                                    ( :begin (:line 5 :col 6) :end (:line 7 :col 8)
+                                                             :message "df1-step2"))))
                    '( :description "Df1"
                       :steps (( :begin (:line 1 :col 2) :end (:line 3 :col 4)
-                                :message "df1-step1" :pos-in-list 2)
+                                       :message "df1-step1" :pos-in-list 2)
                               ( :begin (:line 5 :col 6) :end (:line 7 :col 8)
-                                :message "df1-step2" :pos-in-list 3))
+                                       :message "df1-step2" :pos-in-list 3))
                       :pos-in-list 1)))
     (should (equal (buffer-string)
                    "      // DATAFLOW DESCRIPTION:Df1\n        1:2 3:4:df1-step1\n        5:6 7:8:df1-step2\n"))))
@@ -496,7 +519,7 @@ line 4 with some long text to get 20 column
 (ert-deftest lit-render-fix-test ()
   (with-temp-buffer
     (insert "line1\n")
-    (should (equal (lit-render-fix '( :description "quick fix"
+    (should (equal (lit--render-fix '( :description "quick fix"
                                      :edits (( :begin (:line 10 :col 20) :end (:line 30 :col 40)
                                                :message "edit1\\
 second part")
@@ -529,7 +552,7 @@ third part`
   (with-temp-buffer
     (insert "\n")
     (should
-     (equal (lit-render-issue-spec
+     (equal (lit--render-issue-spec
              '( :file "file.cpp"
                 :rule-id "S1828"
                 :primary ( :begin (:line 1 :col 2) :end (:line 1 :col 3) :message "Prim")
@@ -583,7 +606,7 @@ line3\\
 line4\\
 line5
 line6\\"))
-                                           (lit-modify-line-with-its-continuation-in-buffer
+                                           (lit--modify-line-with-its-continuation-in-buffer
                                             lino tmp-buf (lambda () (forward-line 0) (insert "!")))
                                            (should (equal (current-buffer) cur-buf))
                                            (should (equal (with-current-buffer tmp-buf (buffer-string))
@@ -641,9 +664,9 @@ line6\\"))
   // EDIT static3 +:16 +:18 `;\\
   static int `
 ")
-               (goto-line line)
+               (lit--goto-line line)
                (move-to-column 3)
-               (lit-delete-spec-on-the-line)
+               (lit--delete-spec-on-the-line)
                (should (equal (line-number-at-pos) expected-line))
                (should (equal (current-column) expected-column))
                (should (equal (buffer-string) expected-text)))))
@@ -798,49 +821,49 @@ line2
 linelineee3
 
 l4")
-    (should (equal (lit-column-number-at-pos 3) 2))
-    (should (equal (lit-column-number-at-pos 9) 2))
-    (should (equal (lit-column-number-at-pos 15) 2))
-    (should (equal (lit-column-number-at-pos 23) 10))
-    (should (equal (lit-column-number-at-pos 24) 11))
-    (should (equal (lit-column-number-at-pos 25) 0))
-    (should (equal (lit-column-number-at-pos 26) 0))
-    (should (equal (lit-column-number-at-pos 27) 1))))
+    (should (equal (lit--column-number-at-pos 3) 2))
+    (should (equal (lit--column-number-at-pos 9) 2))
+    (should (equal (lit--column-number-at-pos 15) 2))
+    (should (equal (lit--column-number-at-pos 23) 10))
+    (should (equal (lit--column-number-at-pos 24) 11))
+    (should (equal (lit--column-number-at-pos 25) 0))
+    (should (equal (lit--column-number-at-pos 26) 0))
+    (should (equal (lit--column-number-at-pos 27) 1))))
 
 (ert-deftest lit-render-dumb-spec-test ()
   (with-temp-buffer
     (insert "line1
 line2
 line3")
-    (should (equal (lit-render-dumb-spec 2 1 2) "-1:1 -1:2"))
-    (should (equal (lit-render-dumb-spec 2 2 5) "-1:2 -1:5"))
-    (should (equal (lit-render-dumb-spec 1 7 9) "+1:1 +1:3"))
-    (should (equal (lit-render-dumb-spec 1 7 15) "+1:1 +2:3"))
-    (should (equal (lit-render-dumb-spec 1 14 15) "+2:2 +2:3"))))
+    (should (equal (lit--render-dumb-spec 2 1 2) "-1:1 -1:2"))
+    (should (equal (lit--render-dumb-spec 2 2 5) "-1:2 -1:5"))
+    (should (equal (lit--render-dumb-spec 1 7 9) "+1:1 +1:3"))
+    (should (equal (lit--render-dumb-spec 1 7 15) "+1:1 +2:3"))
+    (should (equal (lit--render-dumb-spec 1 14 15) "+2:2 +2:3"))))
 
-(ert-deftest lit-rewrite-spec-for-pair ()
+(ert-deftest lit-rewrite-spec-for-pair-test ()
   (with-temp-buffer
     (insert "// bla-bla 'XX:XX XX:XX'
 line2")
     (let ((spec-overlay (make-overlay 13 24))
           (target-overlay (make-overlay 28 30)))
-      (lit-rewrite-spec-for-pair (cons spec-overlay target-overlay))
+      (lit--rewrite-spec-for-pair (cons spec-overlay target-overlay))
       (should (equal (buffer-string)
                      "// bla-bla '+1:3 +1:5'
 line2")))))
 
-(ert-deftest lit-adjust-dumb-ranges-test ()
+(ert-deftest lit--adjust-dumb-ranges-test ()
   (with-temp-buffer
     (insert "line1
 // CHECK +1:1 +1:2 S100:Message
 line2")
-    (lit-goto-line 2)
+    (lit--goto-line 2)
     (end-of-line)
-    (let ((overlay-pairs (lit-make-all-dumb-range-spec-overlays))
+    (let ((overlay-pairs (lit--make-all-dumb-range-spec-overlays))
           (inserted-begin (point)))
       (insert "
 line2.5")
-      (lit-adjust-range-specs-after-insertion overlay-pairs inserted-begin (point)))
+      (lit--adjust-range-specs-after-insertion overlay-pairs inserted-begin (point)))
     (should (equal (buffer-string)
                    "line1
 // CHECK +2:1 +2:2 S100:Message
