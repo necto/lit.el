@@ -5,16 +5,19 @@
 ;; Created: 17.06.23
 
 ;;; Commentary:
-;; Easy the manipulation of the lit-tester style specification comments.
+;; Ease the display and manipulation of the lit-tester style specification comments.
 ;; Comment have the form // KEYWORD ...
 ;; E.g. // CHECK :1 :2 S100:Message
 ;; Insert, remove, and readjust them.
-;; Defines two user-level functions:
-;; * li-insert-issues
-;; * li-delete-spec
+;; Defines a minor mode LIT-MODE that highlights target ranges for lit specification commants
+;; and adds two user-level functions:
+;; * LIT-INSERT-ISSUES
+;; * LIT-DELETE-SPEC
 
 ;;; Code:
 
+(require 'cl-lib)
+(require 'lit-parse)
 
 (defun lit-highlight-cur-spec-range ()
   "The main call of the mode. Should be called every time the point lands on a new line.
@@ -72,10 +75,10 @@ they coprise of mouse-down + mouse-up.")
   "Add highlight for at the position specified by `TARGET-RANGE' and `KEYWORD-RANGE'"
   (let* ((target-begin (plist-get target-range :begin))
          (target-end (max (1+ target-begin) (plist-get target-range :end)))
-         (target-hl (lit---make-hl target-begin target-end nil 'lit-default-face))
-         (keyword-hl (lit---make-hl (plist-get keyword-range :begin) (plist-get keyword-range :end) nil 'lit-default-face)))
+         (target-hl (lit--make-hl target-begin target-end nil 'lit-default-face))
+         (keyword-hl (lit--make-hl (plist-get keyword-range :begin) (plist-get keyword-range :end) nil 'lit-default-face)))
     (push (cons target-hl keyword-hl) lit-highlights)
-    (lit---remove-old-hl (length lit-faces))
+    (lit--remove-old-hl (length lit-faces))
     (lit-cycle-colors)))
 
 (defun lit-cycle-colors ()
@@ -92,7 +95,7 @@ One color per highlighted range."
                lit-highlights
                lit-faces)))
 
-(defun lit---make-hl (beg end buf face)
+(defun lit--make-hl (beg end buf face)
   "Make a highlight at the position specified by `BEG' and `END'."
   (let (hl)
     (setq hl (make-overlay beg end buf))
@@ -100,115 +103,25 @@ One color per highlighted range."
     (overlay-put hl 'priority 1)
     hl))
 
-(defun lit---remove-hl (hl)
+(defun lit--remove-hl (hl)
   "Clear highlight."
   (when (overlayp hl)
     (delete-overlay hl)))
 
-(defun lit---remove-old-hl (&optional max-hls)
+(defun lit--remove-old-hl (&optional max-hls)
   "Remove and deactivate all old highlights. Keep `MAX-HLS' newest highlights."
   (unless max-hls (setq max-hls (length (lit-faces))))
   (let ((oldest (reverse lit-highlights)))
     (dolist (highlight-pair (butlast oldest max-hls))
       (let ((target-hl (car highlight-pair))
             (keyword-hl (cdr highlight-pair)))
-        (lit---remove-hl target-hl)
-        (lit---remove-hl keyword-hl)))
+        (lit--remove-hl target-hl)
+        (lit--remove-hl keyword-hl)))
     (setq lit-highlights (reverse (last oldest max-hls)))))
-
-(defun lit-line-offset-parse (line-offset-str)
-  "Parse the (smart) offset specification.
-It understands nil, for :same,
-+N, -N, for regular relative offsets
-+, - for smart offsets."
-  (cond ((null line-offset-str) '(:same))
-        ((string-match "^ *\\+$" line-offset-str) '(:smart-next))
-        ((string-match "^ *-$" line-offset-str) '(:smart-prev))
-        (t (let ((offset (string-to-number line-offset-str)))
-             (if (< 0 offset)
-                 `(:next ,offset)
-               `(:prev ,(- offset)))))))
-
-(defconst lit-regular-spec-src-regex "// \\([A-Z]+\\)\\(\\[[^]]+\\]\\)?\\( +\\)\\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
-  "Regex for CHECK, SECONDARY, and DATAFLOW specs.")
-(defconst lit-regular-spec-indices
-  '( :keyword 1
-     :begin-line-offset 4
-     :begin-col 5
-     :end-line-offset 6
-     :end-col 7)
-  "Indices of the matched regex corresponding to different semantic elements of the regular spec.")
-(defconst lit-edit-src-regex "// \\(EDIT\\) [^ ]+ \\([+-][0-9]*\\)?:\\([0-9]+\\) ?\\([+-][0-9]*\\)?:\\([0-9]+\\)"
-  "Regex for EDIT specs")
-(defconst lit-edit-indices
-  '( :keyword 1
-     :begin-line-offset 2
-     :begin-col 3
-     :end-line-offset 4
-     :end-col 5)
-  "Indices of the matched regex corresponding to different semantic elements of the EDIT spec.")
-(defconst lit-other-spec-src-regex "// \\(FIX\\|DATAFLOW DESCRIPTION\\|COMMENT\\|NOEXECFLOW\\|NOFIX\\)"
-  "Regex for all the specs that do not feature range to highlight.
-Needed to properly skip lines when resolving smart offsets.")
-
-(defun lit-string-match-spec (line)
-  "Match `LINE' agains all the spec regexes.
-Returns nil for no match,
-  or a plist with :offset of the match and :indices where applicable."
-  (if-let ((offset (string-match lit-regular-spec-src-regex line)))
-      `(:offset ,offset :indices ,lit-regular-spec-indices)
-    (if-let ((offset (string-match lit-edit-src-regex line)))
-        `(:offset ,offset :indices ,lit-edit-indices)
-      (if-let ((offset (string-match lit-other-spec-src-regex line)))
-          `(:offset ,offset :indices nil)
-        nil))))
-
-(defun lit-is-pure-lit-spec (line)
-  "Check if `LINE'. I.e. contains only spec data or whitespace. "
-  (if-let ((offset-indices (lit-string-match-spec line)))
-      (string-match "^ *$" (substring line 0 (plist-get offset-indices :offset)))
-    nil))
-
-(defun lit-is-cur-line-pure-lit-spec ()
-  "Check if current line is part of a pure specification
-(i.e. contains no non-spec data other than whitespace).
-Handles '\'-extended lines. "
-  (save-excursion
-    (lit-move-to-start-of-multiline)
-    (lit-is-pure-lit-spec (thing-at-point 'line t))))
-
-(defun lit-get-lit-spec-range (spec-line)
-  "Parse a lit specification string SPEC-LINE and return the property-list
-specifying the begin/end line and column offsets"
-  (if-let ((offset-indices (lit-string-match-spec spec-line)))
-      (if-let ((indices (plist-get offset-indices :indices)))
-          (let ((keyword-begin-col (match-beginning (plist-get indices :keyword)))
-                (keyword-end-col (match-end (plist-get indices :keyword)))
-                (range-spec-begin-col (or (match-beginning (plist-get indices :begin-line-offset))
-                                          (1- (match-beginning (plist-get indices :begin-col)))))
-                (range-spec-end-col (match-end (plist-get indices :end-col)))
-                (begin-line-offset-str (match-string (plist-get indices :begin-line-offset) spec-line))
-                (begin-col-offset-str (match-string (plist-get indices :begin-col) spec-line))
-                (end-line-offset-str (match-string (plist-get indices :end-line-offset) spec-line))
-                (end-col-offset-str (match-string (plist-get indices :end-col) spec-line)))
-            (let ((begin-line-offset (lit-line-offset-parse begin-line-offset-str))
-                  (begin-col-offset (string-to-number begin-col-offset-str))
-                  (end-line-offset (lit-line-offset-parse end-line-offset-str))
-                  (end-col-offset (string-to-number end-col-offset-str)))
-              `( :begin-line-offset ,begin-line-offset
-                 :begin-col ,begin-col-offset
-                 :end-line-offset ,end-line-offset
-                 :end-col ,end-col-offset
-                 :keyword-begin-col ,keyword-begin-col
-                 :keyword-end-col ,keyword-end-col
-                 :range-spec-begin-col ,range-spec-begin-col
-                 :range-spec-end-col ,range-spec-end-col))))
-    nil))
 
 (defun lit-move-to-start-of-multiline ()
   "Move the point to the first line in a sequence of '\'-extended lines."
-  (let ((ret (thing-at-point 'line t))
-        (line-moved t))
+  (let ((line-moved t))
     (while (and line-moved (< 1 (line-number-at-pos)))
       (forward-line -1)
       (let ((prev-line (thing-at-point 'line t)))
@@ -216,10 +129,18 @@ specifying the begin/end line and column offsets"
             (setq line-moved nil)
             (forward-line))))))
 
+(defun lit-is-cur-line-pure-lit-spec ()
+  "Check if current line is part of a pure specification
+(i.e. contains no non-spec data other than whitespace).
+Handles '\'-extended lines. "
+  (save-excursion
+    (lit-move-to-start-of-multiline)
+    (lit-parse-is-pure-lit-spec (thing-at-point 'line t))))
+
 (defun lit-get-cur-lit-spec-range ()
   "Get the parsed range specifiation from the current line if it contains one.
 Return nil otherwise."
-  (lit-get-lit-spec-range (thing-at-point 'line t)))
+  (lit-parse-get-lit-spec-range (thing-at-point 'line t)))
 
 (defun lit-point-at-col-and-line (col line-offset)
   "Calculate the point if current position was shifted according to `LINE-OFFSET'.
@@ -270,7 +191,7 @@ and transform it to the point values :begin and :end plist."
 (define-minor-mode lit-mode
   "Highlight ranges referenced from lit specification comments"
   :lighter nil
-  (lit---remove-old-hl 0))
+  (lit--remove-old-hl 0))
 
 (if (fboundp 'evil-next-line)
     (progn
@@ -288,9 +209,6 @@ and transform it to the point values :begin and :end plist."
 
 (ad-enable-advice 'mouse-set-point 'after 'lit-highlight-ranges-mouse-set-point)
 (ad-activate 'mouse-set-point)
-
-
-(provide 'lit-highlight-mode)
 
 (defface lit-hint-preview '((t :foreground "dark green" :height .7 :extend t))
   "Face used for the preview generated around the target location when choosing the location of the spec.")
@@ -321,191 +239,6 @@ and transform it to the point values :begin and :end plist."
 (defvar lit-dumb-range-overlays '()
   "List of pairs of overlays connecting a range specification with its target range.")
 (make-local-variable 'lit-dumb-range-overlays)
-
-
-(defconst lit-tester-filename-regex "^ */[^:.\"']+\\.[^:.\"']+$"
-  "Matches the filename-only line that precedes every issue in tester output.")
-
-(defun lit-match-filename (first-line)
-  (if (string-match lit-tester-filename-regex first-line)
-      (match-string 0 first-line)
-    nil))
-
-(defconst lit-tester-primary-regex "\\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) \\([^:]+\\):\\(.*\\)")
-
-(defun lit-parse-primary-spec (spec-line)
-  (if (string-match lit-tester-primary-regex spec-line)
-      (let ((begin-line (string-to-number (match-string 1 spec-line)))
-            (begin-col (string-to-number (match-string 2 spec-line)))
-            (end-line (string-to-number (match-string 3 spec-line)))
-            (end-col (string-to-number (match-string 4 spec-line)))
-            (rule-id (match-string 5 spec-line))
-            (message (match-string 6 spec-line)))
-        `( :rule-id ,rule-id
-           :primary ( :begin (:line ,begin-line :col ,begin-col)
-                      :end (:line ,end-line :col ,end-col)
-                      :message ,message)))
-    nil))
-
-(defconst lit-tester-secondary-regex "\\(/[^:]+\\):    \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\):\\(.*\\)")
-(defconst lit-tester-d-dataflows-regex "[0-9]+ data flows:")
-(defconst lit-tester-dataflow-descr-regex "// DATAFLOW DESCRIPTION:\\(.*\\)$")
-
-(defun lit-parse-secondary-spec (spec-line)
-  (if (string-match lit-tester-secondary-regex spec-line)
-      (let ((filename (match-string 1 spec-line))
-            (begin-line (string-to-number (match-string 2 spec-line)))
-            (begin-col (string-to-number (match-string 3 spec-line)))
-            (end-line (string-to-number (match-string 4 spec-line)))
-            (end-col (string-to-number (match-string 5 spec-line)))
-            (message (match-string 6 spec-line)))
-        `( :filename ,filename
-           :secondary ( :begin (:line ,begin-line :col ,begin-col)
-                        :end (:line ,end-line :col ,end-col)
-                        :message ,message)))
-    nil))
-
-(defun lit-split-into-secondary-dataflow-fix-specs (lines)
-  (let ((secondary-specs '())
-        (dataflow-specs '())
-        (fix-specs '())
-        (now-collecting :secondaries))
-    (dolist (line lines)
-      (cl-case now-collecting
-        (:secondaries
-         (if (string-match-p lit-tester-d-dataflows-regex line)
-             ;; This particular line is useless
-             (setq now-collecting :dataflows)
-           (if (string-match-p lit-tester-fix-descr-regex line)
-               (progn
-                 (setq now-collecting :fixes)
-                 (push line fix-specs))
-             (push line secondary-specs))))
-        (:dataflows
-         (if (string-match-p lit-tester-fix-descr-regex line)
-             (progn
-               (setq now-collecting :fixes)
-               (push line fix-specs))
-           (push line dataflow-specs)))
-        (:fixes
-         (if (string-match-p lit-tester-d-dataflows-regex line)
-             ;; This particular line is useless
-             (setq new-collecting :dataflows)
-           (push line fix-specs)))
-        (t (error "Unexpected state %s" now-collecting))))
-    (list (reverse secondary-specs)
-          (reverse dataflow-specs)
-          (reverse fix-specs))))
-
-(defun lit-not-dataflow-descr (l)
-  (not (string-match-p lit-tester-dataflow-descr-regex l)))
-
-(defun lit-parse-dataflows (dataflow-specs)
-  (let ((dataflows '())
-        (dataflow-specs dataflow-specs))
-    (while dataflow-specs
-      (let ((it-is-descr (string-match lit-tester-dataflow-descr-regex (car dataflow-specs))))
-        (cl-assert it-is-descr)
-        (let* ((description (match-string 1 (car dataflow-specs)))
-               (step-specs (seq-take-while #'lit-not-dataflow-descr (cdr dataflow-specs)))
-               (steps (mapcar #'lit-parse-secondary-spec step-specs)))
-          (setq dataflow-specs (seq-drop-while #'lit-not-dataflow-descr (cdr dataflow-specs)))
-          (push `( :description ,description
-                   :steps ,(mapcar (lambda (step) (plist-get step :secondary)) steps))
-                dataflows))))
-    (reverse dataflows)))
-
-(defconst lit-tester-fix-descr-regex "// FIX \\(.*\\)$")
-(defconst lit-tester-edit-regex "// EDIT \\([0-9]+\\):\\([0-9]+\\) \\([0-9]+\\):\\([0-9]+\\) `\\([^`]*\\)`")
-
-(defun lit-not-fix-descr (l)
-  (not (string-match-p lit-tester-fix-descr-regex l)))
-
-(defun lit-parse-edit-spec (spec-line)
-  (if (string-match lit-tester-edit-regex spec-line)
-      (let ((begin-line (string-to-number (match-string 1 spec-line)))
-            (begin-col (string-to-number (match-string 2 spec-line)))
-            (end-line (string-to-number (match-string 3 spec-line)))
-            (end-col (string-to-number (match-string 4 spec-line)))
-            (message (match-string 5 spec-line)))
-        `( :begin (:line ,begin-line :col ,begin-col)
-           :end (:line ,end-line :col ,end-col)
-           :message ,message))
-    nil))
-
-(defun lit-parse-fixes (fix-specs)
-  (let ((fixes '())
-        (fix-specs fix-specs))
-    (while fix-specs
-      (let ((it-is-descr (string-match lit-tester-fix-descr-regex (car fix-specs))))
-        (cl-assert it-is-descr)
-        (let* ((description (match-string 1 (car fix-specs)))
-               (edit-specs (seq-take-while #'lit-not-fix-descr (cdr fix-specs)))
-               (edits (mapcar #'lit-parse-edit-spec edit-specs)))
-          (cl-assert (cl-every #'consp edits)) ; All edits are parsed
-          (setq fix-specs (seq-drop-while #'lit-not-fix-descr (cdr fix-specs)))
-          (push `( :description ,description :edits ,edits)
-                fixes))))
-    (reverse fixes)))
-
-(defun lit-join-multilines (lines)
-  (let ((joined '())
-        (accumulated-multiline ""))
-    (dolist (line lines)
-      (if (string-suffix-p "\\" line)
-          (setq accumulated-multiline (concat accumulated-multiline line "\n"))
-        (push (concat accumulated-multiline line) joined)
-        (setq accumulated-multiline "")))
-    (unless (string-empty-p accumulated-multiline)
-      (push accumulated-multiline joined))
-    (reverse joined)))
-
-(defun lit-parse-1-observed (observed-report)
-  "Parse the observed issue report as printed by tester"
-  (print observed-report)
-  (let ((lines (lit-join-multilines (split-string observed-report "\n" t))))
-    (if-let ((filename (string-trim-left (lit-match-filename (car lines))))
-             (primary-spec (lit-parse-primary-spec (cadr lines))))
-        (cl-destructuring-bind (secondary-specs dataflow-specs fix-specs)
-            (lit-split-into-secondary-dataflow-fix-specs (cddr lines))
-          (let ((secondaries (mapcar #'lit-parse-secondary-spec secondary-specs))
-                (dataflows (lit-parse-dataflows dataflow-specs))
-                (fixes (lit-parse-fixes fix-specs)))
-            (cl-assert (cl-every #'consp secondaries)) ; All secondaries parsed
-            (mapc (lambda (secondary) (cl-assert (equal filename (plist-get secondary :filename))))
-                  secondaries)
-            `( :file ,filename
-               :rule-id ,(plist-get primary-spec :rule-id)
-               :primary ,(plist-get primary-spec :primary)
-               :secondaries ,(mapcar (lambda (secondary) (plist-get secondary :secondary)) secondaries)
-               :dataflows ,dataflows
-               :fixes ,fixes)))
-      (print "failed")
-      nil)))
-
-(defun lit-chop-string (string separator)
-  "Same as (split-string STRING separator) but preserves the separators in the cut strings.
-Modifies MATCH DATA."
-  (let ((result '())
-        (begin-cur-str 0)
-        (end-last-match 0))
-    (while (when-let ((end-cur-str (string-match separator string end-last-match)))
-      (push (substring string begin-cur-str end-cur-str) result)
-      (setq begin-cur-str end-cur-str
-            end-last-match (match-end 0))))
-    (push (substring string begin-cur-str) result)
-    (setq result (reverse result))
-    (if (and (string-empty-p (car result)) (cdr result))
-        (cdr result)
-      result)))
-
-(defun lit-parse-all-observed (observed-multiisue-report)
-  "Parse the observed report of multiple issues as printed by tester"
-  (let* ((observed-single-reports (lit-chop-string observed-multiisue-report lit-tester-filename-regex))
-         (issue-specs (mapcar #'lit-parse-1-observed observed-single-reports)))
-    ;; Make sure all issues parsed
-    (dolist (issue-spec issue-specs) (cl-assert issue-spec))
-    issue-specs))
 
 (defun lit-insert-next (line overlay)
   (goto-char (overlay-end overlay))
@@ -565,26 +298,26 @@ Modifies MATCH DATA."
       (lit-short-preview lit-hint-same spec)
     ""))
 
-(defvar lit---uncleared-overlays '()
+(defvar lit--uncleared-overlays '()
   "Holds a list of all the temporary overlays that exist and should be cleaned up at the end")
 
 (defun lit-make-overlay (&rest args)
   (let ((overlay (apply #'make-overlay args)))
-    (push overlay lit---uncleared-overlays)
+    (push overlay lit--uncleared-overlays)
     overlay))
 
 (defun lit-copy-overlay (source)
   (let ((copy (copy-overlay source)))
-    (push copy lit---uncleared-overlays)
+    (push copy lit--uncleared-overlays)
     copy))
 
 (defun lit-clear-overlay (overlay)
   (delete-overlay overlay)
-  (setq lit---uncleared-overlays (delete overlay lit---uncleared-overlays)))
+  (setq lit--uncleared-overlays (delete overlay lit--uncleared-overlays)))
 
 (defun lit-clear-overlays ()
-  (mapc #'delete-overlay lit---uncleared-overlays)
-  (setq lit---uncleared-overlays nil))
+  (mapc #'delete-overlay lit--uncleared-overlays)
+  (setq lit--uncleared-overlays nil))
 
 (defun lit-goto-line (n)
   (goto-char (point-min))
