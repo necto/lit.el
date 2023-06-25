@@ -6,6 +6,8 @@
 ;;; Commentary:
 ;;; Code:
 
+(load-file "test/undercover-init.el")
+
 (add-to-list 'load-path "..")
 (require 'lit-parse)
 
