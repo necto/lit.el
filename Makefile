@@ -3,19 +3,8 @@
 
 test:
 	@echo "Testing..."
-	emacs -Q -batch --eval "(progn\
-	(add-to-list 'load-path \".\")\
-	(add-to-list 'load-path \"..\")\
-	(add-to-list 'load-path \"./test\")\
-	(require 'lit-test)\
-	(require 'lit-parse-test)\
-	(ert-run-tests-batch-and-exit))"
-
-test-interactive:
-	emacs -Q --debug-init --eval "(progn\
-	(add-to-list 'load-path \".\")\
-	(add-to-list 'load-path \"..\")\
-	(add-to-list 'load-path \"./test\")\
-	(require 'lit-test)\
-	(require 'lit-parse-test)\
-	(ert t))"
+	emacs -Q -batch -l lit-parse.el \
+					-l lit.el \
+					-l test/lit-parse-test.el \
+					-l test/lit-test.el\
+					-f ert-run-tests-batch-and-exit
