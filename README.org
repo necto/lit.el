@@ -1,0 +1,4 @@
+
+* lit.el - a mode facilitating the work with lit-tester specifications
+
+[[https://coveralls.io/repos/github/necto/lit.el/badge.svg]]
