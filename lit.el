@@ -23,7 +23,7 @@
   `((((class color) (background light))
      (:background "yellow"))
     (((class color) (background dark))
-     (:background "DodgerBlue1"))
+     (:background "blue3"))
     (t :inverse-video t))
   "Face used for most-recent lit-range highlight.")
 
@@ -31,7 +31,7 @@
   `((((class color) (background light))
      (:background "gold1"))
     (((class color) (background dark))
-     (:background "DodgerBlue2"))
+     (:background "#161630"))
     (t :inverse-video t))
   "Face used for 2nd-most-recent lit-range highlight.")
 
@@ -39,21 +39,28 @@
   `((((class color) (background light))
      (:background "wheat2"))
     (((class color) (background dark))
-     (:background "DodgerBlue3"))
+     (:background "gray7"))
     (t :inverse-video t))
   "Face used for 3rd-most-recent lit-range highlight.")
 
 (defface lit-hint-preview '((t :foreground "dark green" :height .7 :extend t))
   "Face used for the preview generated around the target location when choosing the location of the spec.")
 
-(defface lit-target-range '((t :background "yellow"))
+(defface lit-target-range '((((class color) (background dark))
+                             (:background "blue2"))
+                            (t :background "yellow"))
   "Face used to highlight the target region for an insertion.")
 
-(defface lit-currently-inserting '((t :slant italic :height 1.0 :weight bold :background "yellow"))
+(defface lit-currently-inserting '((((class color) (background dark))
+                                    (:slant italic :height 1.0 :weight bold :background "blue2"))
+                                   (t :slant italic :height 1.0 :weight bold :background "yellow"))
   "Face used to highlight the target region for an insertion.")
 
-(defface lit-cancelled-line '((t :slant normal :weight normal
-                                :height 1.0 :background nil :foreground "gray" :strike-through t))
+(defface lit-cancelled-line '((((class color) (background dark))
+                               (:slant normal :weight normal
+                                 :height 1.0 :background nil :foreground "dark gray" :strike-through t))
+                              (t :slant normal :weight normal
+                                 :height 1.0 :background nil :foreground "gray" :strike-through t))
   "Face used to highlight the target region for an insertion.")
 
 (defface lit-processed-line '((t :weight normal :slant normal :height 1.0 :foreground "forest green"))
