@@ -6,7 +6,8 @@
 ;;; Commentary:
 ;;; Code:
 
-(load-file "test/undercover-init.el")
+(when (file-exists-p "test/undercover-init.el")
+  (load-file "test/undercover-init.el"))
 
 (add-to-list 'load-path "..")
 (require 'lit-parse)
