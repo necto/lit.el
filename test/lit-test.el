@@ -489,7 +489,7 @@ line 4 with some long text to get 20 column
     (should (equal (buffer-string)
                    "line1\n1:2 3:4 S100:Hello\n"))))
 
-(ert-deftest lit-render-primary-test ()
+(ert-deftest lit-render-secondary-test ()
   (with-temp-buffer
     (should (equal (lit--render-secondary '( :begin (:line 1 :col 2) :end (:line 3 :col 4)
                                              :message "Hello"))
