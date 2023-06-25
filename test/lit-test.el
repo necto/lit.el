@@ -6,7 +6,8 @@
 ;;; Commentary:
 ;;; Code:
 
-(ignore-errors (load-file "test/undercover-init.el"))
+(when (require 'undercover nil t)
+  (undercover "lit.el" (:report-format 'lcov) (:send-report nil)))
 
 (add-to-list 'load-path "..")
 (require 'lit)
