@@ -825,7 +825,7 @@ Return ISSUE-SPEC with each location with line numbers of the
 produced specification."
   (plist-put issue-spec :primary
              (lit--render-primary (plist-get issue-spec :primary)
-                                (plist-get issue-spec :rule-id)))
+                                  (plist-get issue-spec :rule-id)))
   (plist-put issue-spec :secondaries
              (mapcar #'lit--render-secondary (plist-get issue-spec :secondaries)))
   (plist-put issue-spec :dataflows
@@ -942,14 +942,87 @@ region."
             (forward-line)))
         (lit--clear-overlay reg)))))
 
-;; (defun lit-run-tester ()
-;;   (let ((buffer (switch-to-buffer-other-window "*tester-output*")))
-;;     (erase-buffer)
-;;     (setq major-mode #'c++-mode)
-;;     (shell-command "/home/arseniy/proj/sonar-cpp/build/asserts/tester -include-unchecked/home/arseniy/proj/sonar-cpp/test/std-mock -ignore=S799,S878,S1005,S1908 -no-color -diff=false /home/arseniy/proj/sonar-cpp/test/checks/SymbolicExecution/ReclaimedTemporaryChecker.cpp" buffer)))
+(defcustom lit-exec-path
+  "/home/arseniy/proj/sonar-cpp/build/asserts/lit"
+  "Path to the lit script that is used to run the tests."
+  :type 'file)
 
-; (ert "lit-.*")
+(defun lit-parse-full-report (report)
+  (let* ((unexpected-start (string-match "[0-9]+ unexpected in .* mode:\n" report))
+         (unexpected-end (match-end 0))
+         (missing-start (string-match "[0-9]+ missing in .* mode:\n" report))
+         (missing-end (match-end 0)))
+    (if unexpected-start
+        `(:expected-header ,(substring report 0 unexpected-start)
+          :unexpected-header ,(substring report unexpected-start unexpected-end)
+          :unexpected ,(lit-parse-all-observed (substring report unexpected-end missing-start))
+          ,@(if missing-start
+                `(:missing-header ,(substring report missing-start missing-end)
+                  :missing ,(lit-parse-all-observed (substring report missing-end)))
+              '()))
+      (cl-assert missing-start)
+      `(:expected-header ,(substring report 0 missing-start)
+        :missing-header ,(substring report missing-start missing-end)
+        :missing ,(lit-parse-all-observed (substring report missing-end))))))
+
+(defun lit--cut-and-parse-lit-output (lit-output)
+  (if-let* ((report-start (string-match "[0-9]+ expected messages" lit-output))
+            (report-end (string-match "error: command failed with exit status" lit-output))
+            (preamble (substring lit-output 0 report-start))
+            (full-report (substring lit-output report-start report-end))
+            (postamble (substring lit-output report-end)))
+      `( :preamble ,preamble
+         :report ,(lit-parse-full-report full-report)
+         :postamble ,postamble)
+    (let* ((pass-start (string-match "PASS:.*\n" lit-output))
+           (pass-end (match-end 0)))
+      `( :preamble ,(substring lit-output 0 pass-start)
+         :pass ,(substring lit-output pass-start pass-end)
+         :postamble ,(substring lit-output pass-end)))))
+
+(defface lit-irrelevant-output '((t :height .5 :weight extra-light))
+  "Face used to render lit output that is of no relevance")
+
+(defface lit-expected-heading '((t :foreground "forest green"))
+  "Face used to render the 'NN expected messages' line.")
+
+(defface lit-unexpected-heading '((t :foreground "orange red" :weight bold))
+  "Face used to render the 'NN unexpected messages' line.")
+
+(defface lit-missing-heading '((t :foreground "orange red" :weight bold))
+  "Face used to render the 'NN missing messages' line.")
+
+(defun lit--rerender-lit-output (cut-lit-output)
+  (erase-buffer)
+  (let ((preamble (plist-get cut-lit-output :preamble))
+        (postamble (plist-get cut-lit-output :postamble))
+        (ret '()))
+    (insert (propertize preamble 'face 'lit-irrelevant-output))
+    (if-let ((report (plist-get cut-lit-output :report)))
+        (progn
+          (insert (propertize (plist-get report :expected-header) 'face 'lit-expected-heading))
+          (when-let ((unexpected-header (plist-get report :unexpected-header)))
+            (insert (propertize unexpected-header 'face 'lit-unexpected-heading))
+            (setq ret (mapcar #'lit--render-issue-spec (plist-get report :unexpected))))
+          (when-let ((missing-header (plist-get report :missing-header)))
+            (insert (propertize missing-header 'face 'lit-missing-heading))
+                                        ; Ignore the missing issues for now. just render them but do not preserve their spec
+            (mapc #'lit--render-issue-spec (plist-get report :missing))))
+      (insert (propertize (plist-get cut-lit-output :pass) 'face 'lit-expected-heading)))
+    (insert (propertize postamble 'face 'lit-irrelevant-output))
+    ret))
+
+(defun lit-run-tester (&optional test-file)
+  "Run lit script on the file and display processed output in a dedicated buffer."
+  (let* ((prev-buffer (current-buffer))
+        (test-file (or test-file (buffer-file-name)))
+        (buffer (switch-to-buffer-other-window "*tester-output*"))
+        (command (concat lit-exec-path " -DNODIFF -DNOCOLOR -v --no-progress-bar " test-file)))
+    (erase-buffer)
+    (shell-command command buffer)
+                                        ; TODO: forward the ret value somewhere
+    (lit--rerender-lit-output (lit--cut-and-parse-lit-output (substring-no-properties (buffer-string))))
+    (switch-to-buffer-other-window prev-buffer)))
 
 (provide 'lit)
-
 ;;; lit.el ends here
