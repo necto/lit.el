@@ -834,16 +834,16 @@ produced specification."
              (mapcar #'lit--render-fix (plist-get issue-spec :fixes)))
   issue-spec)
 
-(defconst lit--aux-buffer-name "*issues-to-add*"
+(defconst lit--aux-buffer-name "*tester-output*"
   "The name of the buffer holding some the issues to be added and indicating your progress.")
 
-(defun lit--render-issue-specs-dedicated-buffer (issue-specs)
+(defun lit--render-issue-specs-dedicated-buffer (issue-specs dedicated-buffer)
   "Produce a tester-output-like text specification in the dedicated buffer.
 Opens the buffer in another window.
 Return ISSUE-SPEC with each location with line numbers of the
 produced specification."
-  (let ((prev-buffer (current-buffer))
-        (buffer (switch-to-buffer-other-window lit--aux-buffer-name)))
+  (let ((prev-buffer (current-buffer)))
+    (switch-to-buffer-other-window dedicated-buffer)
     (erase-buffer)
     (let ((specs-with-lines (mapcar #'lit--render-issue-spec issue-specs)))
       (switch-to-buffer-other-window prev-buffer)
@@ -855,7 +855,6 @@ produced specification."
     (with-current-buffer buf
       (lit--goto-line lino)
       (when-let ((window (get-buffer-window buf)))
-        (print window)
         (set-window-point window (point)))
       (funcall modif)
       (while (and (< (point) (point-max))
@@ -896,8 +895,21 @@ the specification and highlights inserted, cancelled, and current locs.
 "
   (interactive "sInsert full 'unexpected' output: ")
   (if-let ((issue-specs (lit-parse-all-observed observed-report)))
-      (lit--insert-issue-specs (lit--render-issue-specs-dedicated-buffer issue-specs))
+      (lit--insert-issue-specs (lit--render-issue-specs-dedicated-buffer issue-specs lit--aux-buffer-name))
     (print "malformed 'unexpected' output")))
+
+(defvar lit--output-unexpected-issues '()
+  "A pre-parsed, pre-indexed list of the unexpected issues from last lit run.")
+
+;;;###autoload
+(defun lit-insert-issues-from-run ()
+  "Insert the unexpected issues reported by the last lit run."
+  (interactive)
+  (when lit--output-unexpected-issues
+    (when-let* ((file (plist-get (car lit--output-unexpected-issues) :file))
+                (buffer (find-buffer-visiting file)))
+      (switch-to-buffer-other-window buffer)
+      (lit--insert-issue-specs lit--output-unexpected-issues))))
 
 (defconst lit--removable-spec-src-regex
   " *// \\(\\(CHECK\\|FIX\\|EDIT\\|DATAFLOW\\|DATAFLOW DESCRIPTION\\|SECONDARY\\|NOEXECFLOW\\)\\(\\[.*\\]\\)? .*\\|NOFIX\\)$"
@@ -1020,8 +1032,8 @@ region."
         (command (concat lit-exec-path " -DNODIFF -DNOCOLOR -v --no-progress-bar " test-file)))
     (erase-buffer)
     (shell-command command buffer)
-                                        ; TODO: forward the ret value somewhere
-    (lit--rerender-lit-output (lit--cut-and-parse-lit-output (substring-no-properties (buffer-string))))
+    (setq lit--output-unexpected-issues
+          (lit--rerender-lit-output (lit--cut-and-parse-lit-output (substring-no-properties (buffer-string)))))
     (switch-to-buffer-other-window prev-buffer)))
 
 (provide 'lit)
