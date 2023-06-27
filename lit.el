@@ -203,6 +203,14 @@ and transform it to the point values :begin and :end plist."
 (defadvice mouse-set-point (after lit-highlight-ranges-mouse-set-point)
   (lit-highlight-cur-spec-range))
 
+(defface lit--step-marker '((t :height .8 :weight bold
+                             :box (:line-width (4 . -4)
+                                   :color "rose"
+                                   :style released-button)
+                             :background "dark red"
+                             :foreground "white"))
+  "Face used for the little markers on the side of each secondary step.")
+
 (defun lit-highlight-cur-spec-range ()
   "The main call of the LIT-MODE.
 Should be called every time the point lands on a new line.
@@ -218,17 +226,34 @@ It identifies the range specification and highlights it in the same buffer."
                    (keyword-range (lit--resolve-keyword-range-offset range-spec)))
               (lit--add-range target-range keyword-range))))
     (when lit--tester-output-mode
-      (lit--unhighlight-targets-for-lines)
-      (when-let* ((lino (save-excursion
-                     (lit--move-to-start-of-multiline)
-                     (line-number-at-pos)))
-                  (target-loc
-                   (gethash
-                    lino
-                    lit--output-unexpected-issues-line-to-loc-ht)))
-        (dolist (loc (gethash lino lit--output-headers-to-steps))
-          (lit--highlight-target loc nil 'lit-tail-face1 1))
-        (lit--highlight-target target-loc t 'lit-default-face 2)))))
+      (lit--highlight-cur-spec-target-ranges))))
+
+(defvar lit--numbered-overlays '()
+  "Keep track of all the overlays used to number secondary steps.")
+
+(defun lit--highlight-cur-spec-target-ranges ()
+  (lit--unhighlight-targets-for-lines)
+  (lit--unnumber-lines)
+  (when-let* ((lino (save-excursion
+                      (lit--move-to-start-of-multiline)
+                      (line-number-at-pos)))
+              (target-loc
+               (gethash
+                lino
+                lit--output-unexpected-issues-line-to-loc-ht))
+              (sec-num 0))
+    (dolist (loc (gethash lino lit--output-headers-to-steps))
+      (let ((num-mark (propertize (number-to-string sec-num)
+                                  'face 'lit--step-marker)))
+        (lit--number-line (plist-get loc :pos-in-list) num-mark)
+        (lit--highlight-target
+         loc nil `((face . lit-tail-face1)
+                   (priority . 1)
+                   (before-string . ,num-mark)))
+        (cl-incf sec-num)))
+    (lit--highlight-target
+     target-loc t '((face . lit-default-face)
+                    (priority . 2)))))
 
 ;;;###autoload
 (define-minor-mode lit-mode
@@ -893,12 +918,28 @@ Use the corresponding :POS-IN-LIST as the key."
 (defvar lit--highlighted-targets-for-lines '()
   "A list of all target overlays highlighted")
 
+(defun lit--unnumber-lines ()
+  (mapc #'delete-overlay lit--numbered-overlays)
+  (setq lit--numbered-overlays '()))
+
+(defun lit--number-line (lino num)
+  (save-excursion
+    (lit--goto-line lino)
+    (lit--move-to-start-of-multiline)
+    (goto-char (line-end-position))
+    (re-search-backward ":" (line-beginning-position))
+    (let ((overlay (make-overlay (point) (line-end-position))))
+      (push overlay lit--numbered-overlays)
+      (overlay-put overlay 'before-string num)
+      (overlay-put overlay 'face 'lit-tail-face1))))
+
 (defun lit--unhighlight-targets-for-lines ()
   (dolist (overlay lit--highlighted-targets-for-lines)
-    (overlay-put overlay 'face nil))
+    (overlay-put overlay 'face nil)
+    (overlay-put overlay 'before-string nil))
   (setq lit--highlighted-targets-for-lines '()))
 
-(defun lit--highlight-target (loc focus face priority)
+(defun lit--highlight-target (loc focus attributes)
   (when-let* ((overlay (plist-get loc :overlay))
               (target-buffer (overlay-buffer overlay))
               (prev-buffer (current-buffer)))
@@ -908,8 +949,8 @@ Use the corresponding :POS-IN-LIST as the key."
       (goto-char (overlay-start overlay))
       (recenter))
     (switch-to-buffer-other-window prev-buffer)
-    (overlay-put overlay 'face face)
-    (overlay-put overlay 'priority priority)
+    (dolist (attribute attributes)
+      (overlay-put overlay (car attribute) (cdr attribute)))
     (push overlay lit--highlighted-targets-for-lines)))
 
 (defconst lit--aux-buffer-name "*tester-output*"
