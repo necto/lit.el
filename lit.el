@@ -804,6 +804,9 @@ Interactively asks user to make choices on every step."
 Interactively asks user to make choices on every step."
   (unwind-protect
       (let ((issue-specs (mapcar #' lit--generate-overlays issue-specs)))
+        (lit--unnumber-lines)
+        (lit--unhighlight-targets-for-lines)
+        (lit--remove-old-hl 0)
         (mapc #'lit--insert-issue-spec-with-overlays issue-specs))
     (lit--clear-overlays)))
 
