@@ -75,16 +75,14 @@
 (defconst lit--highlight-faces '(lit-default-face lit-tail-face1 lit-tail-face2)
   "List of all highlight faces used to highlight the N most-recent ranges.")
 
-(defvar lit--highlights '()
+(defvar-local lit--highlights '()
   "List of all highlight-overlay currently displayed.")
-(make-variable-buffer-local 'lit--highlights)
 
-(defvar lit--last-line-highlihted nil
+(defvar-local lit--last-line-highlihted nil
   "Last line that was highlighted.
 Used to avoid duplicating highlight on the same line.
 This happens with mouse-click events because
 they coprise of mouse-down + mouse-up.")
-(make-variable-buffer-local 'lit--last-line-highlihted)
 
 (defun lit--cycle-colors ()
   "Cycle highlight colors to match the lit--highlight-faces list.
@@ -218,13 +216,28 @@ It identifies the range specification and highlights it in the same buffer."
           (if-let ((range-spec (lit--get-cur-lit-spec-range))
                    (target-range (lit--resolve-range-offsets range-spec))
                    (keyword-range (lit--resolve-keyword-range-offset range-spec)))
-              (lit--add-range target-range keyword-range))))))
+              (lit--add-range target-range keyword-range))))
+    (when lit--tester-output-mode
+      (lit--unhighlight-targets-for-lines)
+      (lit--highlight-target-for-line
+       (save-excursion
+         (lit--move-to-start-of-multiline)
+         (line-number-at-pos))
+        lit--output-unexpected-issues-line-to-loc-ht
+        t))))
 
 ;;;###autoload
 (define-minor-mode lit-mode
-  "Highlight ranges referenced from lit specification comments"
+  "Highlight ranges referenced from lit specification comments."
   :lighter nil
   (lit--remove-old-hl 0))
+
+;;;###autoload
+(define-minor-mode lit--tester-output-mode
+  "Add some interactivity to the tester output."
+  :lighter "LIT"
+  :interactive nil
+  (lit--unhighlight-targets-for-lines))
 
 (if (fboundp 'evil-next-line)
     (progn
@@ -245,11 +258,10 @@ It identifies the range specification and highlights it in the same buffer."
 
 (defun lit-record-current-line-if-dumb ()
   (if-let ((dumb-range-pair (lit--make-dumb-range-spec-overlay-pair)))
-      (push dumb-range-pair lit-dumb-range-overlays)))
+      (push dumb-range-pair lit--dumb-range-overlays)))
 
-(defvar lit-dumb-range-overlays '()
+(defvar-local lit--dumb-range-overlays '()
   "List of pairs of overlays connecting a range specification with its target range.")
-(make-local-variable 'lit-dumb-range-overlays)
 
 (defun lit--insert-next (line overlay)
   (goto-char (overlay-end overlay))
@@ -338,9 +350,6 @@ It identifies the range specification and highlights it in the same buffer."
   "Move to the line N reliably and non-interactively."
   (goto-char (point-min))
   (forward-line (1- n)))
-
-(defvar-local lit--range-spec-overlays '()
-  "Overlay pairs that connect range specifications with their target ranges")
 
 (defun lit--make-dumb-range-spec-overlay-pair ()
   "Return a pair or overlays connecting range spec with its target range or nil.
@@ -733,7 +742,7 @@ These are produced by lit--generate-overlays.
 For each location the function asks the position next to the target where it should be inserted.
 For optional elements - DATAFLOW DESCRIPTION, or entire FIX/EDITs it asks confirmation."
   (atomic-change-group
-    (setq lit-dumb-range-overlays (lit--make-all-dumb-range-spec-overlays))
+    (setq lit--dumb-range-overlays (lit--make-all-dumb-range-spec-overlays))
     (let* ((default-id (lit--find-closest-defined-identifier
                         (plist-get (plist-get issue-spec :primary) :overlay)))
            (exec-id (lit--ask-exec-flow-id issue-spec default-id))
@@ -751,7 +760,7 @@ For optional elements - DATAFLOW DESCRIPTION, or entire FIX/EDITs it asks confir
       (when dataflow-ids
         (lit--insert-dataflows (plist-get issue-spec :dataflows) dataflow-ids prim-spec-overlay))
       (lit--insert-fixes (plist-get issue-spec :fixes) fix-ids prim-spec-overlay)
-      (mapc #'lit--rewrite-spec-for-pair lit-dumb-range-overlays))))
+      (mapc #'lit--rewrite-spec-for-pair lit--dumb-range-overlays))))
 
 (defun lit-insert-issue-spec (issue-spec)
   "Insert a single issue specification according to ISSUE-SPEC.
@@ -834,6 +843,43 @@ produced specification."
              (mapcar #'lit--render-fix (plist-get issue-spec :fixes)))
   issue-spec)
 
+(defun lit--add-locs-to-hashtable (issue-spec line-to-loc)
+  "Add all locations from ISSUE-SPEC to LINE-TO-LOC hashtable.
+Use the corresponding :POS-IN-LIST as the key."
+  (cl-labels ((add-loc (loc)
+                       (when (consp loc)
+                         (mapc #'add-loc loc)
+                         (when-let ((pos-in-list (plist-get loc :pos-in-list)))
+                           (puthash pos-in-list loc line-to-loc)))))
+    (add-loc issue-spec)))
+
+(defun lit--make-hashtable-line-to-loc (issue-specs)
+  (let ((ht (make-hash-table)))
+    (lit--add-locs-to-hashtable issue-specs ht)
+    ht))
+
+(defvar lit--highlighted-targets-for-lines '()
+  "A list of all target overlays highlighted")
+
+(defun lit--unhighlight-targets-for-lines ()
+  (dolist (overlay lit--highlighted-targets-for-lines)
+    (overlay-put overlay 'face nil))
+  (setq lit--highlighted-targets-for-lines '()))
+
+(defun lit--highlight-target-for-line (line line-to-loc-ht focus)
+  (when-let* ((loc (gethash line line-to-loc-ht))
+              (overlay (plist-get loc :overlay))
+              (target-buffer (overlay-buffer overlay))
+              (prev-buffer (current-buffer)))
+    (switch-to-buffer-other-window target-buffer)
+    (lit--remove-old-hl 0)
+    (when focus
+      (goto-char (overlay-start overlay))
+      (recenter))
+    (switch-to-buffer-other-window prev-buffer)
+    (overlay-put overlay 'face 'lit-default-face)
+    (push overlay lit--highlighted-targets-for-lines)))
+
 (defconst lit--aux-buffer-name "*tester-output*"
   "The name of the buffer holding some the issues to be added and indicating your progress.")
 
@@ -900,6 +946,9 @@ the specification and highlights inserted, cancelled, and current locs.
 
 (defvar lit--output-unexpected-issues '()
   "A pre-parsed, pre-indexed list of the unexpected issues from last lit run.")
+
+(defvar lit--output-unexpected-issues-line-to-loc-ht nil
+  "Cached hashtable mapping lines in the rendered list of issues to locs.")
 
 ;;;###autoload
 (defun lit-insert-issues-from-run ()
@@ -1026,15 +1075,23 @@ region."
 
 (defun lit-run-tester (&optional test-file)
   "Run lit script on the file and display processed output in a dedicated buffer."
+  (interactive)
   (let* ((prev-buffer (current-buffer))
         (test-file (or test-file (buffer-file-name)))
         (buffer (switch-to-buffer-other-window "*tester-output*"))
         (command (concat lit-exec-path " -DNODIFF -DNOCOLOR -v --no-progress-bar " test-file)))
     (erase-buffer)
+    (lit--tester-output-mode)
     (shell-command command buffer)
-    (setq lit--output-unexpected-issues
-          (lit--rerender-lit-output (lit--cut-and-parse-lit-output (substring-no-properties (buffer-string)))))
-    (switch-to-buffer-other-window prev-buffer)))
+    (let ((unexpected-issues (lit--rerender-lit-output
+                              (lit--cut-and-parse-lit-output
+                               (substring-no-properties (buffer-string))))))
+      (switch-to-buffer-other-window prev-buffer)
+      (setq lit--output-unexpected-issues
+            (mapcar #'lit--generate-overlays
+                    unexpected-issues))
+      (setq lit--output-unexpected-issues-line-to-loc-ht
+            (lit--make-hashtable-line-to-loc lit--output-unexpected-issues)))))
 
 (provide 'lit)
 ;;; lit.el ends here

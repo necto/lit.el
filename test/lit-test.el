@@ -873,6 +873,27 @@ line2.5")
 line2.5
 line2"))))
 
+(ert-deftest lit--add-locs-to-hashtable-test ()
+  (let ((ht (make-hash-table)))
+    (lit--add-locs-to-hashtable '() ht)
+    (should (equal (hash-table-count ht) 0))
+    (lit--add-locs-to-hashtable '(1 2 (3 4) :here "five") ht)
+    (should (equal (hash-table-count ht) 0)))
+  (let ((ht (make-hash-table)))
+    (lit--add-locs-to-hashtable '(:id 1 :str "hi" :pos-in-list 14) ht)
+    (should (equal (hash-table-count ht) 1))
+    (should (equal (gethash 14 ht) '(:id 1 :str "hi" :pos-in-list 14)))
+    (lit--add-locs-to-hashtable
+     '(( :name submarine :pos-in-list 0)
+       ( "irrelevant" 1 43 '() ( :kind relevant :pos-in-list 3
+                                       ( :kind nested :pos-in-list 4))))
+     ht)
+    (should (equal (hash-table-count ht) 4))
+    (should (equal (gethash 0 ht) '(:name submarine :pos-in-list 0)))
+    (should (equal (gethash 4 ht) '(:kind nested :pos-in-list 4)))
+    (should (equal (gethash 3 ht) '(:kind relevant :pos-in-list 3
+                                    (:kind nested :pos-in-list 4))))))
+
 (provide 'lit-test)
 
 ;;; lit-test.el ends here
