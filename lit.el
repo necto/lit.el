@@ -853,9 +853,20 @@ Use the corresponding :POS-IN-LIST as the key."
                            (puthash pos-in-list loc line-to-loc)))))
     (add-loc issue-spec)))
 
+(defun lit--map-headers-to-primary-loc (issue-specs line-to-loc)
+  (dolist (issue-spec issue-specs)
+    (when-let ((primary (plist-get issue-spec :primary)))
+      (dolist (dataflow (plist-get issue-spec :dataflows))
+        (when-let ((header-line (plist-get dataflow :pos-in-list)))
+          (puthash header-line primary line-to-loc)))
+      (dolist (fix (plist-get issue-spec :fixes))
+        (when-let ((header-line (plist-get fix :pos-in-list)))
+          (puthash header-line primary line-to-loc))))))
+
 (defun lit--make-hashtable-line-to-loc (issue-specs)
   (let ((ht (make-hash-table)))
     (lit--add-locs-to-hashtable issue-specs ht)
+    (lit--map-headers-to-primary-loc issue-specs ht)
     ht))
 
 (defvar lit--highlighted-targets-for-lines '()

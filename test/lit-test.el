@@ -894,6 +894,31 @@ line2"))))
     (should (equal (gethash 3 ht) '(:kind relevant :pos-in-list 3
                                     (:kind nested :pos-in-list 4))))))
 
+(ert-deftest lit--map-headers-to-primary-loc-test ()
+  (let ((ht (make-hash-table)))
+    (puthash 1 2 ht)
+    (lit--map-headers-to-primary-loc
+     '((:dataflows ((:description "gg" :pos-in-list 3 :steps ()))))
+     ht)
+    (should (equal (hash-table-count ht) 1))
+    (lit--map-headers-to-primary-loc
+     '((:dataflows ((:description "gg" :pos-in-list 3 :steps ()))
+        :primary (:something :something)))
+     ht)
+    (should (equal (hash-table-count ht) 2))
+    (should (equal (gethash 3 ht) '(:something :something)))
+    (lit--map-headers-to-primary-loc
+     '((:dataflows ((:pos-in-list 5) (:pos-in-list 8))
+        :primary "another beast")
+       (:dataflows ((:pos-in-list 50) (:pos-in-list 80))
+        :primary 42))
+     ht)
+    (should (equal (hash-table-count ht) 6))
+    (should (equal (gethash 5 ht) (gethash 8 ht)))
+    (should (equal (gethash 5 ht) "another beast"))
+    (should (equal (gethash 50 ht) (gethash 80 ht)))
+    (should (equal (gethash 50 ht) 42))))
+
 (provide 'lit-test)
 
 ;;; lit-test.el ends here
