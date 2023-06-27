@@ -219,12 +219,16 @@ It identifies the range specification and highlights it in the same buffer."
               (lit--add-range target-range keyword-range))))
     (when lit--tester-output-mode
       (lit--unhighlight-targets-for-lines)
-      (lit--highlight-target-for-line
-       (save-excursion
-         (lit--move-to-start-of-multiline)
-         (line-number-at-pos))
-        lit--output-unexpected-issues-line-to-loc-ht
-        t))))
+      (when-let* ((lino (save-excursion
+                     (lit--move-to-start-of-multiline)
+                     (line-number-at-pos)))
+                  (target-loc
+                   (gethash
+                    lino
+                    lit--output-unexpected-issues-line-to-loc-ht)))
+        (dolist (loc (gethash lino lit--output-headers-to-steps))
+          (lit--highlight-target loc nil 'lit-tail-face1 1))
+        (lit--highlight-target target-loc t 'lit-default-face 2)))))
 
 ;;;###autoload
 (define-minor-mode lit-mode
@@ -869,6 +873,23 @@ Use the corresponding :POS-IN-LIST as the key."
     (lit--map-headers-to-primary-loc issue-specs ht)
     ht))
 
+(defun lit--make-hashtable-header-line-to-dependants (issue-specs)
+  (let ((ht (make-hash-table)))
+    (dolist (issue-spec issue-specs)
+      (when-let ((secondaries (plist-get issue-spec :secondaries)))
+        (puthash (plist-get (plist-get issue-spec :primary) :pos-in-list)
+                 secondaries
+                 ht))
+      (dolist (dataflow (plist-get issue-spec :dataflows))
+        (when-let ((pos (plist-get dataflow :pos-in-list))
+                   (steps (plist-get dataflow :steps)))
+          (puthash pos steps ht)))
+      (dolist (fix (plist-get issue-spec :fixes))
+        (when-let ((pos (plist-get fix :pos-in-list))
+                   (edits (plist-get fix :edits)))
+          (puthash pos edits ht))))
+    ht))
+
 (defvar lit--highlighted-targets-for-lines '()
   "A list of all target overlays highlighted")
 
@@ -877,9 +898,8 @@ Use the corresponding :POS-IN-LIST as the key."
     (overlay-put overlay 'face nil))
   (setq lit--highlighted-targets-for-lines '()))
 
-(defun lit--highlight-target-for-line (line line-to-loc-ht focus)
-  (when-let* ((loc (gethash line line-to-loc-ht))
-              (overlay (plist-get loc :overlay))
+(defun lit--highlight-target (loc focus face priority)
+  (when-let* ((overlay (plist-get loc :overlay))
               (target-buffer (overlay-buffer overlay))
               (prev-buffer (current-buffer)))
     (switch-to-buffer-other-window target-buffer)
@@ -888,7 +908,8 @@ Use the corresponding :POS-IN-LIST as the key."
       (goto-char (overlay-start overlay))
       (recenter))
     (switch-to-buffer-other-window prev-buffer)
-    (overlay-put overlay 'face 'lit-default-face)
+    (overlay-put overlay 'face face)
+    (overlay-put overlay 'priority priority)
     (push overlay lit--highlighted-targets-for-lines)))
 
 (defconst lit--aux-buffer-name "*tester-output*"
@@ -960,6 +981,13 @@ the specification and highlights inserted, cancelled, and current locs.
 
 (defvar lit--output-unexpected-issues-line-to-loc-ht nil
   "Cached hashtable mapping lines in the rendered list of issues to locs.")
+
+(defvar lit--output-headers-to-steps nil
+  "Cached hashtable mapping the line of a header to a list of steps.
+A header is any of:
+- primary location (mapped to secondaries)
+- dataflow description (mapped to dataflow steps)
+- fix description (mapped to edits)")
 
 ;;;###autoload
 (defun lit-insert-issues-from-run ()
@@ -1102,7 +1130,10 @@ region."
             (mapcar #'lit--generate-overlays
                     unexpected-issues))
       (setq lit--output-unexpected-issues-line-to-loc-ht
-            (lit--make-hashtable-line-to-loc lit--output-unexpected-issues)))))
+            (lit--make-hashtable-line-to-loc lit--output-unexpected-issues))
+      (setq lit--output-headers-to-steps
+            (lit--make-hashtable-header-line-to-dependants
+             lit--output-unexpected-issues)))))
 
 (provide 'lit)
 ;;; lit.el ends here

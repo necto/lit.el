@@ -919,6 +919,28 @@ line2"))))
     (should (equal (gethash 50 ht) (gethash 80 ht)))
     (should (equal (gethash 50 ht) 42))))
 
+(ert-deftest lit--make-hashtable-header-line-to-dependants ()
+  (let ((ht (lit--make-hashtable-header-line-to-dependants
+             '((:primary (:message "m" :pos-in-list 13)
+                :secondaries ((:message "m1" :pos-in-list 3)
+                              (:arbitrary "prop"))
+                :dataflows () :fixes ())
+               (:primary (:pos-in-list 15)
+                :secondaries (("some"))
+                :dataflows ((:description "df1" :pos-in-list 34
+                                          :steps (1 2 3))
+                            (:description "df2" :pos-in-list 84
+                                          :steps ("a" "b" "c")))
+                :fixes ((:pos-in-list 1 :edits ())
+                        (:pos-in-list 2 :edits (a b c))))))))
+    (should (equal (gethash 13 ht)
+                   '((:message "m1" :pos-in-list 3) (:arbitrary "prop"))))
+    (should (equal (gethash 15 ht) '(("some"))))
+    (should (equal (gethash 34 ht) '(1 2 3)))
+    (should (equal (gethash 84 ht) '("a" "b" "c")))
+    (should (equal (gethash 2 ht) '(a b c)))
+    (should (equal (hash-table-count ht) 5))))
+
 (provide 'lit-test)
 
 ;;; lit-test.el ends here
