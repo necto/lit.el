@@ -396,7 +396,7 @@ Return nil otherwise."
 (defun lit--make-all-dumb-range-spec-overlays ()
   (save-excursion
     (let ((overlay-pairs '()))
-      (beginning-of-buffer)
+      (goto-char (point-min))
       (while (< (point) (point-max))
         (if-let ((overlay-pair (lit--make-dumb-range-spec-overlay-pair)))
             (push overlay-pair overlay-pairs))
