@@ -159,13 +159,12 @@ Return nil otherwise."
   "Calculate the point if current position was shifted according to LINE-OFFSET.
 And moved to the COL horisontal column."
   (save-excursion
-    (cond ((equal (car line-offset) :prev) (forward-line (- 0 (cadr line-offset))))
-          ((equal (car line-offset) :next) (forward-line (cadr line-offset)))
-          ((equal (car line-offset) :smart-prev)
-           (while (lit--is-cur-line-pure-lit-spec) (forward-line -1)))
-          ((equal (car line-offset) :smart-next)
-           (while (lit--is-cur-line-pure-lit-spec) (forward-line)))
-          (t t))
+    (pcase line-offset
+      (`(:prev ,delta) (forward-line (- 0 delta)))
+      (`(:next ,delta) (forward-line delta))
+      (`(:smart-prev) (while (lit--is-cur-line-pure-lit-spec) (forward-line -1)))
+      (`(:smart-next) (while (lit--is-cur-line-pure-lit-spec) (forward-line)))
+      (_ t))
     (move-to-column (- col 1))
     (point)))
 
@@ -930,7 +929,7 @@ Use the corresponding :POS-IN-LIST as the key."
     (lit--goto-line lino)
     (lit--move-to-start-of-multiline)
     (goto-char (line-end-position))
-    (re-search-backward ":" (line-beginning-position))
+    (search-backward ":" (line-beginning-position))
     (let ((overlay (make-overlay (point) (line-end-position))))
       (push overlay lit--numbered-overlays)
       (overlay-put overlay 'before-string num)

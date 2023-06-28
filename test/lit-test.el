@@ -941,6 +941,52 @@ line2"))))
     (should (equal (gethash 2 ht) '(a b c)))
     (should (equal (hash-table-count ht) 5))))
 
+(defconst lit--test-str-with-specs
+  "line1
+line2 // CHECK :1 :2 S100:message
+// COMMENT message
+// SECONDARY :1 :2 id: message
+// FIX fix-id:description
+line6 // EDIT fix-id :1 :2 `mes\\
+age'
+// EDIT fix-id :3 :4 `l1\\
+l2\\
+l3'
+line11")
+
+(ert-deftest lit--is-cur-line-pure-lit-spec-test ()
+  (with-temp-buffer
+    (insert lit--test-str-with-specs)
+    (lit--goto-line 1) (should (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 2) (should (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 3) (should-not (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 4) (should-not (equal (lit--is-cur-line-pure-lit-spec) t))
+    (lit--goto-line 5) (should-not (equal (lit--is-cur-line-pure-lit-spec) t))
+    (lit--goto-line 6) (should (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 7) (should (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 8) (should-not (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 9) (should-not (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 10) (should-not (equal (lit--is-cur-line-pure-lit-spec) nil))
+    (lit--goto-line 11) (should (equal (lit--is-cur-line-pure-lit-spec) nil))))
+
+(ert-deftest lit--point-at-col-and-line-test ()
+  (with-temp-buffer
+    (insert lit--test-str-with-specs)
+    (cl-flet ((relative-to (lino col line-offset)
+                           (lit--goto-line lino)
+                           (goto-char (lit--point-at-col-and-line col line-offset))
+                           (cons (line-number-at-pos) (current-column))))
+      (should (equal (relative-to 3 3 '(:prev 2)) '(1 . 2)))
+      (should (equal (relative-to 3 1 '(:next 2)) '(5 . 0)))
+      (should (equal (relative-to 3 4 '(:smart-next)) '(6 . 3)))
+      (should (equal (relative-to 3 2 '(:smart-prev)) '(2 . 1)))
+      (should (equal (relative-to 6 2 '(:smart-prev)) '(6 . 1)))
+      (should (equal (relative-to 6 2 '(:smart-next)) '(6 . 1)))
+      (should (equal (relative-to 9 2 '(:smart-prev)) '(7 . 1))) ; multiline 6-7 is non-pure, stop at 7
+      (should (equal (relative-to 9 2 '(:smart-next)) '(11 . 1)))
+      (should (equal (relative-to 10 2 '(:smart-prev)) '(7 . 1))) ; Same as from line 9
+      (should (equal (relative-to 10 2 '(:smart-next)) '(11 . 1)))))); Same as from line 9
+
 (provide 'lit-test)
 
 ;;; lit-test.el ends here
