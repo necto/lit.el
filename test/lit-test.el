@@ -949,7 +949,7 @@ line2 // CHECK :1 :2 S100:message
 // FIX fix-id:description
 line6 // EDIT fix-id :1 :2 `mes\\
 age'
-// EDIT fix-id :3 :4 `l1\\
+// EDIT fix-id -:3 -:4 `l1\\
 l2\\
 l3'
 line11")
@@ -986,6 +986,63 @@ line11")
       (should (equal (relative-to 9 2 '(:smart-next)) '(11 . 1)))
       (should (equal (relative-to 10 2 '(:smart-prev)) '(7 . 1))) ; Same as from line 9
       (should (equal (relative-to 10 2 '(:smart-next)) '(11 . 1)))))); Same as from line 9
+
+(defun lit--buf-string-with-overlay-positions ()
+  (let ((positions
+         (sort (apply #'append
+                (mapcar (lambda (overlay) `((:start . ,(overlay-start overlay))
+                                       (:end . ,(overlay-end overlay))))
+                        (overlays-in (point-min) (point-max))))
+               (lambda (p1 p2) (> (cdr p1) (cdr p2)))))
+        (original-string (buffer-string)))
+    (with-temp-buffer
+      (insert original-string)
+      (dolist (pos positions)
+        (goto-char (cdr pos))
+        (insert (pcase (car pos)
+                  (:start "(")
+                  (:end ")"))))
+      (buffer-string))))
+
+(ert-deftest lit-mode-moves-test()
+  (with-temp-buffer
+    (insert lit--test-str-with-specs)
+    (lit-mode)
+    (goto-char (point-min))
+    (search-forward "COMMENT")
+    (previous-line) ; intentionally call interactive function
+    (let ((hl-overlays (overlays-in (point-min) (point-max))))
+      (dolist (overlay hl-overlays)
+        (should-not (equal (overlay-get overlay 'face) nil)))
+      (should (equal (lit--buf-string-with-overlay-positions)
+                     "line1
+(l)ine2 // (CHECK) :1 :2 S100:message
+// COMMENT message
+// SECONDARY :1 :2 id: message
+// FIX fix-id:description
+line6 // EDIT fix-id :1 :2 `mes\\
+age'
+// EDIT fix-id -:3 -:4 `l1\\
+l2\\
+l3'
+line11"))
+      (search-forward "age'")
+      (next-line) ; intentionally call interactive function
+      (let ((hl-overlays (overlays-in (point-min) (point-max)))))
+      (dolist (overlay hl-overlays)
+        (should-not (equal (overlay-get overlay 'face) nil))))
+    (should (equal (lit--buf-string-with-overlay-positions)
+                   "line1
+(l)ine2 // (CHECK) :1 :2 S100:message
+// COMMENT message
+// SECONDARY :1 :2 id: message
+// FIX fix-id:description
+line6 // EDIT fix-id :1 :2 `mes\\
+ag(e)'
+// (EDIT) fix-id -:3 -:4 `l1\\
+l2\\
+l3'
+line11"))))
 
 (provide 'lit-test)
 
