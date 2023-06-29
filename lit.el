@@ -187,16 +187,7 @@ and transform it to the point values :begin and :end plist."
       :end-line-offset (:same)
       :end-col ,(+ (plist-get range-spec :keyword-end-col) 1))))
 
-(defadvice evil-next-line (after lit-highlight-ranges-evil-next)
-  (lit-highlight-cur-spec-range))
-
-(defadvice next-line (after lit-highlight-ranges-next)
-  (lit-highlight-cur-spec-range))
-
-(defadvice previous-line (after lit-highlight-ranges-prev)
-  (lit-highlight-cur-spec-range))
-
-(defadvice evil-previous-line (after lit-highlight-ranges-evil-prev)
+(defadvice line-move (after lit-highlight-line-move)
   (lit-highlight-cur-spec-range))
 
 (defadvice mouse-set-point (after lit-highlight-ranges-mouse-set-point)
@@ -267,20 +258,8 @@ It identifies the range specification and highlights it in the same buffer."
   :interactive nil
   (lit--unhighlight-targets-for-lines))
 
-(if (fboundp 'evil-next-line)
-    (progn
-      (ad-enable-advice 'evil-next-line 'after 'lit-highlight-ranges-evil-next)
-      (ad-activate 'evil-next-line))
-  (ad-enable-advice 'next-line 'after 'lit-highlight-ranges-next)
-  (ad-activate 'next-line))
-
-(if (fboundp 'evil-previous-line)
-    (progn
-      (ad-enable-advice 'evil-previous-line 'after 'lit-highlight-ranges-evil-prev)
-      (ad-activate 'evil-previous-line))
-  (ad-enable-advice 'previous-line 'after 'lit-highlight-ranges-prev)
-  (ad-activate 'previous-line))
-
+(ad-enable-advice 'line-move 'after 'lit-highlight-line-move)
+(ad-activate 'line-move)
 (ad-enable-advice 'mouse-set-point 'after 'lit-highlight-ranges-mouse-set-point)
 (ad-activate 'mouse-set-point)
 
