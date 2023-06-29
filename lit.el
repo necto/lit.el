@@ -1018,7 +1018,8 @@ A header is any of:
   (when lit--output-unexpected-issues
     (when-let* ((file (plist-get (car lit--output-unexpected-issues) :file))
                 (buffer (find-buffer-visiting file)))
-      (switch-to-buffer-other-window buffer)
+      (unless (equal (buffer-file-name) file)
+        (switch-to-buffer-other-window buffer))
       (lit--insert-issue-specs lit--output-unexpected-issues))))
 
 (defconst lit--removable-spec-src-regex
