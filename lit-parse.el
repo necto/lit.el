@@ -12,6 +12,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'seq)
 
 (defun lit-parse--line-offset-parse (line-offset-str)
   "Parse the (smart) offset specification.

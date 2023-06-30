@@ -17,6 +17,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'seq)
 (require 'lit-parse)
 
 (defface lit-default-face
