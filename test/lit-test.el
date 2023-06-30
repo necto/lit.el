@@ -1010,7 +1010,7 @@ line11")
     (lit-mode)
     (goto-char (point-min))
     (search-forward "COMMENT")
-    (previous-line) ; intentionally call interactive function
+    ;; (previous-line) ; intentionally call interactive function
 ;;     (let ((hl-overlays (overlays-in (point-min) (point-max))))
 ;;       (dolist (overlay hl-overlays)
 ;;         (should-not (equal (overlay-get overlay 'face) nil)))
