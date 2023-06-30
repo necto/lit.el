@@ -929,11 +929,7 @@ Use the corresponding :POS-IN-LIST as the key."
     (switch-to-buffer-other-window target-buffer)
     (lit--remove-old-hl 0)
     (when focus
-      (let ((prev-scroll-margin scroll-margin))
-        (when (or (null scroll-margin) (< scroll-margin 10))
-          (setq scroll-margin 10))
-        (goto-char (overlay-start overlay))
-        (setq scroll-margin prev-scroll-margin)))
+      (goto-char (overlay-start overlay)))
     (switch-to-buffer-other-window prev-buffer)
     (dolist (attribute attributes)
       (overlay-put overlay (car attribute) (cdr attribute)))
