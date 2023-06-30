@@ -66,10 +66,10 @@
 (defface lit-processed-line '((t :weight normal :slant normal :height 1.0 :foreground "forest green"))
   "Face used to indicate that a line was already inserted.")
 
-(defface lit-hint-keyword '((t :height .5 :box t))
+(defface lit-hint-keyword '((t :height .5 :box t :foreground "black"))
   "Face used to distinguish the keywords prefixing the insertion options.")
 
-(defface lit-hint-key '((t :height .5 :weight bold :box t))
+(defface lit-hint-key '((t :height .5 :weight bold :box t :foreground "black"))
   "Face used to distinguish the hotkey associated with the insertion-option keyword.")
 
 (defconst lit--highlight-faces '(lit-default-face lit-tail-face1 lit-tail-face2)
