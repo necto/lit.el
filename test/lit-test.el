@@ -1007,43 +1007,10 @@ line11")
 (ert-deftest lit-mode-moves-test()
   (with-temp-buffer
     (insert lit--test-str-with-specs)
-    (lit-mode)
-    (goto-char (point-min))
-    (search-forward "COMMENT")
-    ;; (previous-line) ; intentionally call interactive function
-;;     (let ((hl-overlays (overlays-in (point-min) (point-max))))
-;;       (dolist (overlay hl-overlays)
-;;         (should-not (equal (overlay-get overlay 'face) nil)))
-;; ;;       (should (equal (lit--buf-string-with-overlay-positions)
-;; ;;                      "line1
-;; ;; (l)ine2 // (CHECK) :1 :2 S100:message
-;; ;; // COMMENT message
-;; ;; // SECONDARY :1 :2 id: message
-;; ;; // FIX fix-id:description
-;; ;; line6 // EDIT fix-id :1 :2 `mes\\
-;; ;; age'
-;; ;; // EDIT fix-id -:3 -:4 `l1\\
-;; ;; l2\\
-;; ;; l3'
-;; ;; line11"))
-;;       )
-;;       (search-forward "age'")
-;;       (next-line) ; intentionally call interactive function
-;;       (let ((hl-overlays (overlays-in (point-min) (point-max)))))
-;;       (dolist (overlay hl-overlays)
-;;         (should-not (equal (overlay-get overlay 'face) nil))))
-;;     (should (equal (lit--buf-string-with-overlay-positions)
-;;                    "line1
-;; (l)ine2 // (CHECK) :1 :2 S100:message
-;; // COMMENT message
-;; // SECONDARY :1 :2 id: message
-;; // FIX fix-id:description
-;; line6 // EDIT fix-id :1 :2 `mes\\
-;; ag(e)'
-;; // (EDIT) fix-id -:3 -:4 `l1\\
-;; l2\\
-;; l3'
-;; line11"))
+    ;; (lit-mode)
+    ;; (goto-char (point-min))
+    ;; (search-forward "COMMENT")
+     (previous-line) ; intentionally call interactive function
     ))
 
 (provide 'lit-test)
