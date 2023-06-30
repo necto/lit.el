@@ -1004,11 +1004,11 @@ line11")
                   (:end ")"))))
       (buffer-string))))
 
-;; (ert-deftest lit-mode-moves-test()
-;;   (with-temp-buffer
-;;     (insert lit--test-str-with-specs)
-;;     (lit-mode)
-;;     (goto-char (point-min))
+(ert-deftest lit-mode-moves-test()
+  (with-temp-buffer
+    (insert lit--test-str-with-specs)
+    (lit-mode)
+    (goto-char (point-min))
 ;;     (search-forward "COMMENT")
 ;;     (previous-line) ; intentionally call interactive function
 ;;     (let ((hl-overlays (overlays-in (point-min) (point-max))))
@@ -1042,7 +1042,8 @@ line11")
 ;; // (EDIT) fix-id -:3 -:4 `l1\\
 ;; l2\\
 ;; l3'
-;; line11"))))
+;; line11"))
+    ))
 
 (provide 'lit-test)
 
