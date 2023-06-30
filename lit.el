@@ -188,12 +188,6 @@ and transform it to the point values :begin and :end plist."
       :end-line-offset (:same)
       :end-col ,(+ (plist-get range-spec :keyword-end-col) 1))))
 
-(defadvice line-move (after lit-highlight-line-move)
-  (lit-highlight-cur-spec-range))
-
-(defadvice mouse-set-point (after lit-highlight-ranges-mouse-set-point)
-  (lit-highlight-cur-spec-range))
-
 (defface lit--step-marker '((t :height .8 :weight bold
                              :box (:line-width (4 . -4)
                                    :color "rose"
@@ -259,10 +253,11 @@ It identifies the range specification and highlights it in the same buffer."
   :interactive nil
   (lit--unhighlight-targets-for-lines))
 
-(ad-enable-advice 'line-move 'after 'lit-highlight-line-move)
-(ad-activate 'line-move)
-(ad-enable-advice 'mouse-set-point 'after 'lit-highlight-ranges-mouse-set-point)
-(ad-activate 'mouse-set-point)
+(defun lit--highlight-cur-spec-range-advice (&rest _args)
+  (lit-highlight-cur-spec-range))
+
+(advice-add 'line-move :after #'lit--highlight-cur-spec-range-advice)
+(advice-add 'mouse-set-point :after #'lit--highlight-cur-spec-range-advice)
 
 (defun lit-record-current-line-if-dumb ()
   (if-let ((dumb-range-pair (lit--make-dumb-range-spec-overlay-pair)))
