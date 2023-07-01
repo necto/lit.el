@@ -73,10 +73,10 @@ line 4
   (with-temp-buffer
     (insert initial-buffer-content)
     (let ((fix-cnt 0))
-      (cl-letf (((symbol-function 'y-or-n-p) (lambda (prompt) t))
-                ((symbol-function 'read-answer) (lambda (&rest args) default-answer))
+      (cl-letf (((symbol-function 'y-or-n-p) (lambda (_prompt) t))
+                ((symbol-function 'read-answer) (lambda (&rest _args) default-answer))
                 ((symbol-function 'read-from-minibuffer)
-                 (lambda (prompt &rest args)
+                 (lambda (prompt &rest _args)
                    (cond ((string-match-p "issue id" prompt) "issue-id")
                          ((string-match-p "id for dataflow" prompt) "df-id")
                          ((string-match-p "id for fix" prompt) (cl-incf fix-cnt) (format "fix-id%d" fix-cnt))
@@ -233,6 +233,31 @@ line 4
            "
 line 2 // SECONDARY :3 :5 issue-id:Sec
 line 3 // CHECK :3 :21 S100(issue-id,df-id,df-id):Prim
+// DATAFLOW DESCRIPTION df-id:Description 2
+// DATAFLOW DESCRIPTION df-id:Description 1
+line 4
+")))
+
+(ert-deftest lit-insert-issue-spec-test-next-lines ()
+  (should (equal
+           (lit-run-insert-issue-spec-batch
+            "
+line 2
+line 3
+line 4
+"
+            '( :file "file.c" :rule-id "S100"
+               :primary ( :begin (:line 3 :col 3) :end (:line 3 :col 21) :message "Prim")
+               :secondaries (( :begin (:line 2 :col 3) :end (:line 2 :col 5) :message "Sec"))
+               :dataflows (( :description "Description 1" :steps ())
+                           ( :description "Description 2" :steps ()))
+               :fixes ())
+            "next")
+           "
+line 2
+// SECONDARY -:3 -:5 issue-id:Sec
+line 3
+// CHECK -:3 -:21 S100(issue-id,df-id,df-id):Prim
 // DATAFLOW DESCRIPTION df-id:Description 2
 // DATAFLOW DESCRIPTION df-id:Description 1
 line 4
