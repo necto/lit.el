@@ -1072,12 +1072,17 @@ line11")
       (should (equal (relative-to 10 2 '(:smart-prev)) '(7 . 1))) ; Same as from line 9
       (should (equal (relative-to 10 2 '(:smart-next)) '(11 . 1)))))); Same as from line 9
 
-(defun lit--buf-string-with-overlay-positions ()
+(defun lit--any (&args) t)
+
+(defun lit--buf-string-with-overlay-positions (filter)
   (let ((positions
          (sort (apply #'append
-                (mapcar (lambda (overlay) `((:start . ,(overlay-start overlay))
-                                       (:end . ,(overlay-end overlay))))
-                        (overlays-in (point-min) (point-max))))
+                      (mapcar (lambda (overlay)
+                                `(,(if-let ((prefix (overlay-get overlay 'before-string)))
+                                        `((:start ,prefix) . ,(overlay-start overlay))
+                                      `(:start . ,(overlay-start overlay)))
+                                  (:end . ,(overlay-end overlay))))
+                              (seq-filter filter (overlays-in (point-min) (point-max)))))
                (lambda (p1 p2) (> (cdr p1) (cdr p2)))))
         (original-string (buffer-string)))
     (with-temp-buffer
@@ -1085,9 +1090,10 @@ line11")
       (dolist (pos positions)
         (goto-char (cdr pos))
         (insert (pcase (car pos)
+                  (`(:start ,prefix) (concat "[" prefix "]("))
                   (:start "(")
                   (:end ")"))))
-      (buffer-string))))
+      (buffer-substring-no-properties (point-min) (point-max)))))
 
 (defun lit--collect-all-highlight-faces ()
   (let ((hl-overlays (overlays-in (point-min) (point-max))))
@@ -1103,7 +1109,7 @@ line11")
     (let ((highlight-faces (lit--collect-all-highlight-faces)))
       (should (equal (length highlight-faces) 2))
       (should (equal (length (cl-remove-duplicates highlight-faces)) 1)))
-    (should (equal (lit--buf-string-with-overlay-positions)
+    (should (equal (lit--buf-string-with-overlay-positions #'lit--any)
                    "line1
 (l)ine2 // (CHECK) :1 :2 S100:message
 // COMMENT message
@@ -1120,7 +1126,7 @@ line11"))
     (let ((highlight-faces (lit--collect-all-highlight-faces)))
       (should (equal (length highlight-faces) 4))
       (should (equal (length (cl-remove-duplicates highlight-faces)) 2)))
-    (should (equal (lit--buf-string-with-overlay-positions)
+    (should (equal (lit--buf-string-with-overlay-positions #'lit--any)
                    "line1
 (l)ine2 // (CHECK) :1 :2 S100:message
 // COMMENT message
@@ -1138,7 +1144,7 @@ line11"))
     (let ((highlight-faces (lit--collect-all-highlight-faces)))
       (should (equal (length highlight-faces) 6))
       (should (equal (length (cl-remove-duplicates highlight-faces)) 3)))
-    (should (equal (lit--buf-string-with-overlay-positions)
+    (should (equal (lit--buf-string-with-overlay-positions #'lit--any)
                    "line1
 line2 // CHECK :1 :2 S100:message
 // COMMENT message
@@ -1167,6 +1173,102 @@ line11"))))
     (should (equal (call "class X {\ntarget\nconst int& f1() {\n}\n \n" "target") "X"))
     (should (equal (call "class X :public Y {\npublic:\n  target\n } \n" "target") "X"))
     (should (equal (call "struct X :public ns::Y<void> {\npublic:\n  target\n } \n" "target") "X"))))
+
+(defun lit--get-tests-directory ()
+  (file-name-directory (symbol-file #'lit--get-tests-directory)))
+
+(defun lit--run-mock-tester (filename)
+  (let* ((tests-dir (lit--get-tests-directory))
+         (lit-exec-path (concat tests-dir "mock-lit/cat-file.sh")))
+    (lit-run-tester filename)))
+
+(defun lit--read-mock (filename)
+  (with-temp-buffer
+    (insert-file-contents (concat (lit--get-tests-directory) "mock-lit/" filename))
+    (buffer-string)))
+
+(ert-deftest lit-run-tester-passing-test ()
+  (with-temp-buffer
+    (lit--run-mock-tester "lit-passed.txt")
+    (with-current-buffer lit--aux-buffer-name
+      (should (equal (buffer-substring-no-properties (point-min) (point-max))
+                     (lit--read-mock "lit-passed.txt"))))))
+
+(ert-deftest lit-run-tester-missing-test ()
+  (with-temp-buffer
+    (lit--run-mock-tester "lit-missing-with-secondaries.txt")
+    (with-current-buffer lit--aux-buffer-name
+      (should (equal (buffer-substring-no-properties (point-min) (point-max))
+                     (lit--read-mock "lit-missing-with-secondaries-expected.txt"))))))
+
+;; TODO: support and test missing underspecified issues, e.g.:
+;; 2 data flows:
+;;   // DATAFLOW <no description specified>
+;; <no steps specified>
+;;   // DATAFLOW DESCRIPTION:Something fishy
+;;     /file.cpp:    37:3 37:4:Step1
+
+(defun lit--selected-lines (str from to)
+  (let ((lines (split-string str "\n")))
+    (mapconcat #'identity (seq-drop (seq-take lines to) (1- from)) "\n")))
+
+(ert-deftest lit-run-tester-unexpected-test ()
+  (let ((initial-content "line1 which might be long
+line2 should also contain q few characters
+line3 must be at least 28 characters long
+line4 is irrelevant
+"))
+    (with-temp-buffer
+      (insert initial-content)
+      (lit--run-mock-tester "lit-unexpected-with-secondaries.txt")
+      (with-current-buffer lit--aux-buffer-name
+        (should (equal (buffer-substring-no-properties (point-min) (point-max))
+                       (lit--read-mock "lit-unexpected-with-secondaries-expected.txt"))))
+      (cl-flet ((overlay-with-face (overlay) (overlay-get overlay 'face)))
+        (should (equal (lit--buf-string-with-overlay-positions #'overlay-with-face)
+                       initial-content))
+        (with-current-buffer lit--aux-buffer-name
+          (goto-char (point-min))
+          (search-forward "1 unexpected")
+          (next-line) ; Interactively change line to trigger the advice
+          (should (equal (lit--selected-lines (lit--buf-string-with-overlay-positions #'overlay-with-face)
+                                              15 22)
+                         "113 expected messages
+1 unexpected in [cpp20] mode:
+2:10 2:13 S5553:Accessing reclaimed temporary
+    2:16 2:21[ 0](:Temporary is created here)
+    3:16 3:28[ 1](:Temporary is reclaimed here)
+    1:10 1:13[ 2](:Accessing reclaimed temporary)
+error: command failed with exit status: 1
+")))
+        (should (equal (lit--buf-string-with-overlay-positions #'overlay-with-face)
+                       "line1 whi[2](ch )might be long
+line2 sho(uld) al[0](so co)ntain q few characters
+line3 must be a[1](t least 28 c)haracters long
+line4 is irrelevant
+"))
+        (with-current-buffer lit--aux-buffer-name
+          (goto-char (point-min))
+          (search-forward "1 unexpected")
+          (next-line) ; repeat the previous position
+          (next-line) ; move to the first secondary ("Temporary is created here")
+          (should (equal (lit--selected-lines (lit--buf-string-with-overlay-positions #'overlay-with-face)
+                                              15 22)
+                         "113 expected messages
+1 unexpected in [cpp20] mode:
+2:10 2:13 S5553:Accessing reclaimed temporary
+    2:16 2:21:Temporary is created here
+    3:16 3:28:Temporary is reclaimed here
+    1:10 1:13:Accessing reclaimed temporary
+error: command failed with exit status: 1
+")))
+        (should (equal (lit--buf-string-with-overlay-positions #'overlay-with-face)
+                       "line1 which might be long
+line2 should al(so co)ntain q few characters
+line3 must be at least 28 characters long
+line4 is irrelevant
+"))
+        ))))
 
 (provide 'lit-test)
 

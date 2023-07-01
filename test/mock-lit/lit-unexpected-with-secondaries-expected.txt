@@ -1,0 +1,32 @@
+-- Testing: 1 tests, 1 workers --
+FAIL:  :: file.cpp (1 of 1)
+******************** TEST ' :: file.cpp' FAILED ********************
+Script:
+--
+: 'RUN: at line 1';   /path/build/asserts/tester -include-unchecked"/path/test/std-mock"   -diff=false -no-color -source-dirs=/some/dir -ignore=S799,S878,S1005,S1908 /path/test/file.cpp
+--
+Exit Code: 1
+
+Command Output (stdout):
+--
+$ ":" "RUN: at line 1"
+$ "/path/build/asserts/tester" "-include-unchecked/path/test/std-mock" "-diff=false" "-no-color" "-source-dirs=/some/dir" "-ignore=S799,S878,S1005,S1908" "/path/test/file.cpp"
+# command output:
+113 expected messages
+1 unexpected in [cpp20] mode:
+2:10 2:13 S5553:Accessing reclaimed temporary
+    2:16 2:21:Temporary is created here
+    3:16 3:28:Temporary is reclaimed here
+    1:10 1:13:Accessing reclaimed temporary
+error: command failed with exit status: 1
+
+--
+
+********************
+********************
+Failed Tests (1):
+   :: file.cpp
+
+
+Testing Time: 0.66s
+  Failed: 1

@@ -1,0 +1,5 @@
+-- Testing: 1 tests, 1 workers --
+PASS:  :: checks/SymbolicExecution/ReclaimedTemporaryChecker.cpp (1 of 1)
+
+Testing Time: 0.67s
+  Passed: 1
