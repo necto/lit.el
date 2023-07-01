@@ -527,17 +527,22 @@ Optional ORDER allows specifying the order of the secondary location."
         (lit--move-to-start-of-multiline)
         (lit-record-current-line-if-dumb)))))
 
-(defconst lit--fun-decl-regex "^[[:alnum:]_&*<>]+ \\([[:alnum:]_]+\\).*{"
-  "Regex matching a C or C++ function or a class definition.")
+(defconst lit--fun-decl-regex "^[[:alnum:] _&*<>:]+ \\([[:alnum:]_]+\\)(.*{"
+  "Regex matching a C or C++ function.")
+
+(defconst lit--class-decl-regex "^\\(struct\\|class\\) +\\([[:alnum:]_]+\\)\\( *:public +[[:alnum:]_<>:]+\\)? +{"
+  "Regex matching a C or C++ struct or class definition.")
 
 (defun lit--find-closest-defined-identifier (prim-target-overlay)
   "Find the closest function or class definition to the given location.
 Used to suggest the issue id for the inserted issue."
   (save-excursion
     (goto-char (overlay-start prim-target-overlay))
-    (if (re-search-backward lit--fun-decl-regex nil t)
-        (substring-no-properties (match-string 1))
-      nil)))
+    (cond ((re-search-backward lit--fun-decl-regex nil t)
+           (substring-no-properties (match-string 1)))
+          ((re-search-backward lit--class-decl-regex nil t)
+           (substring-no-properties (match-string 2)))
+          (t nil))))
 
 (defun lit--valid-identifier-p (str)
   "Check if the given issue-id is valid for an issue specification."

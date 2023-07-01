@@ -1077,6 +1077,23 @@ l2\\
 l3'
 line11"))))
 
+(ert-deftest lit--find-closest-defined-identifier ()
+  (cl-flet ((call (contents target)
+                  (with-temp-buffer
+                    (insert contents)
+                    (let* ((target-begin (string-match (regexp-quote target) contents))
+                           (target-end (match-end 0))
+                           (target-overlay (make-overlay target-begin target-end)))
+                      (goto-char (point-min))
+                      (lit--find-closest-defined-identifier target-overlay)))))
+    (should (equal (call "int f1() {\nint f2() {\n target\n}\n}\n" "target") "f2"))
+    (should (equal (call "int f1() {\n}\n target \nint f2() {\n\n}\n" "target") "f1"))
+    (should (equal (call "std::list<int> f1() {\n}\n target \nint f2() {\n\n}\n" "target") "f1"))
+    (should (equal (call "class X {\nconst int& f1() {\n}\n target \n" "target") "f1"))
+    (should (equal (call "class X {\ntarget\nconst int& f1() {\n}\n \n" "target") "X"))
+    (should (equal (call "class X :public Y {\npublic:\n  target\n } \n" "target") "X"))
+    (should (equal (call "struct X :public ns::Y<void> {\npublic:\n  target\n } \n" "target") "X"))))
+
 (provide 'lit-test)
 
 ;;; lit-test.el ends here
