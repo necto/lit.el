@@ -69,10 +69,10 @@ line 3 // CHECK
 line 4
 ")))
 
-(defun lit-run-no-questions-asked (initial-buffer-content default-answer minibuffer-answers fun)
+(defun lit-run-no-questions-asked (initial-buffer-content y-or-n default-answer minibuffer-answers fun)
   (with-temp-buffer
     (insert initial-buffer-content)
-    (cl-letf (((symbol-function 'y-or-n-p) (lambda (_prompt) t))
+    (cl-letf (((symbol-function 'y-or-n-p) (lambda (_prompt) y-or-n))
               ((symbol-function 'read-answer) (lambda (&rest _args) default-answer))
               ((symbol-function 'read-from-minibuffer)
                (lambda (prompt &rest _args) (funcall minibuffer-answers prompt))))
@@ -86,7 +86,7 @@ line 4
                              ((string-match-p "id for dataflow" prompt) "df-id")
                              ((string-match-p "id for fix" prompt) (cl-incf fix-cnt) (format "fix-id%d" fix-cnt))
                              (t "unexpected"))))
-      (lit-run-no-questions-asked initial-buffer-content default-answer #'all-ids fun))))
+      (lit-run-no-questions-asked initial-buffer-content t default-answer #'all-ids fun))))
 
 (defun lit-run-insert-issue-spec-batch (initial-content issue-spec default-answer)
   (lit-run-no-questions-asked-all-ids initial-content default-answer
@@ -857,7 +857,7 @@ line 4
                                (cond ((string-match-p "issue id" prompt) "!not an Id")
                                      ((string-match-p "valid identifier" prompt) "valid_id")
                                      (t "unexpected"))))
-    (lit-run-no-questions-asked initial-buffer-content default-answer #'on-second-attempt
+    (lit-run-no-questions-asked initial-buffer-content t default-answer #'on-second-attempt
                                 (lambda () (lit-insert-issue-spec issue-spec)))))
 
 (ert-deftest lit-reprompt-for-valid-issue-id-test ()
@@ -872,7 +872,7 @@ line 4
 
 (defun lit-cancel-all-ids (default-answer issue-spec initial-buffer-content)
   (cl-flet ((cancel-ids (_prompt) ""))
-    (lit-run-no-questions-asked initial-buffer-content default-answer #'cancel-ids
+    (lit-run-no-questions-asked initial-buffer-content t default-answer #'cancel-ids
                                 (lambda () (lit-insert-issue-spec issue-spec)))))
 
 (ert-deftest lit-cancel-all-ids-test ()
@@ -883,13 +883,38 @@ line 4
                     :secondaries ((:begin (:line 1 :col 1) :end (:line 1 :col 2) :message "Sec"))
                     :dataflows
                     ((:description "df1"
-                      :steps (( :begin (:line 2 :col 12) :end (:line 2 :col 16)
-                                       :message "This buffer access overflows"))))
+                      :steps ((:begin (:line 2 :col 12) :end (:line 2 :col 16)
+                               :message "DF step1"))))
                     :fixes ((:description "F1"
                              :edits ((:begin (:line 4 :col 3) :end (:line 4 :col 4)
                                       :message "bread")))))
                   "line1\n")
                  "line1 // CHECK :1 :2 S999:P\n")))
+
+(defun lit-cancel-fixes-and-df-descrs (default-answer issue-spec initial-buffer-content)
+  (cl-flet ((same-ids (_prompt) "id"))
+    (lit-run-no-questions-asked initial-buffer-content nil default-answer #'same-ids
+                                (lambda () (lit-insert-issue-spec issue-spec)))))
+
+(ert-deftest lit-cancel-fixes-and-df-descrs-test ()
+  (should (equal (lit-cancel-fixes-and-df-descrs
+                  "next"
+                  '(:file "file.c" :rule-id "S999"
+                    :primary (:begin (:line 1 :col 1) :end (:line 1 :col 2) :message "P")
+                    :secondaries ((:begin (:line 1 :col 1) :end (:line 1 :col 2) :message "Sec"))
+                    :dataflows
+                    ((:description "df1"
+                      :steps ((:begin (:line 1 :col 3) :end (:line 1 :col 4)
+                               :message "DF step"))))
+                    :fixes ((:description "F1"
+                             :edits ((:begin (:line 1 :col 3) :end (:line 1 :col 4)
+                                      :message "bread")))))
+                  "line1\n")
+                 "line1
+// DATAFLOW -:3 -:4 id,0:DF step
+// SECONDARY -:1 -:2 id:Sec
+// CHECK -:1 -:2 S999(id,id):P
+")))
 
 (ert-deftest lit-column-number-at-pos-test ()
   (with-temp-buffer
