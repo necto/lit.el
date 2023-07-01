@@ -1042,7 +1042,22 @@ ag(e)'
 // (EDIT) fix-id -:3 -:4 `l1\\
 l2\\
 l3'
-line11")))))
+line11")))
+    (dotimes (_ 4)
+      (previous-line))
+    ;; the first highlighting must've been removed
+    (should (equal (lit--buf-string-with-overlay-positions)
+                     "line1
+line2 // CHECK :1 :2 S100:message
+// COMMENT message
+(/)/ (SECONDARY) :1 :2 id: message
+// FIX fix-id:description
+(l)ine6 // (EDIT) fix-id :1 :2 `mes\\
+ag(e)'
+// (EDIT) fix-id -:3 -:4 `l1\\
+l2\\
+l3'
+line11"))))
 
 (provide 'lit-test)
 
