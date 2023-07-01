@@ -11,6 +11,7 @@
 
 (add-to-list 'load-path "..")
 (require 'lit)
+(require 'cl-lib)
 
 (ert-deftest lit-move-to-start-of-multiline-test ()
   "Test moving the point to the beginning of '\'-extended chain of lines."
@@ -1004,6 +1005,10 @@ line11")
                   (:end ")"))))
       (buffer-string))))
 
+(defun lit--collect-all-highlight-faces ()
+  (let ((hl-overlays (overlays-in (point-min) (point-max))))
+    (mapcar (lambda (overlay) (overlay-get overlay 'face)) hl-overlays)))
+
 (ert-deftest lit-mode-moves-test()
   (with-temp-buffer
     (insert lit--test-str-with-specs)
@@ -1011,11 +1016,11 @@ line11")
     (goto-char (point-min))
     (search-forward "COMMENT")
     (previous-line) ; intentionally call interactive function
-    (let ((hl-overlays (overlays-in (point-min) (point-max))))
-      (dolist (overlay hl-overlays)
-        (should-not (equal (overlay-get overlay 'face) nil)))
-      (should (equal (lit--buf-string-with-overlay-positions)
-                     "line1
+    (let ((highlight-faces (lit--collect-all-highlight-faces)))
+      (should (equal (length highlight-faces) 2))
+      (should (equal (length (cl-remove-duplicates highlight-faces)) 1)))
+    (should (equal (lit--buf-string-with-overlay-positions)
+                   "line1
 (l)ine2 // (CHECK) :1 :2 S100:message
 // COMMENT message
 // SECONDARY :1 :2 id: message
@@ -1025,14 +1030,14 @@ age'
 // EDIT fix-id -:3 -:4 `l1\\
 l2\\
 l3'
-line11")))
+line11"))
     (search-forward "age'")
     (next-line) ; intentionally call interactive function
-    (let ((hl-overlays (overlays-in (point-min) (point-max))))
-      (dolist (overlay hl-overlays)
-        (should-not (equal (overlay-get overlay 'face) nil)))
-      (should (equal (lit--buf-string-with-overlay-positions)
-                     "line1
+    (let ((highlight-faces (lit--collect-all-highlight-faces)))
+      (should (equal (length highlight-faces) 4))
+      (should (equal (length (cl-remove-duplicates highlight-faces)) 2)))
+    (should (equal (lit--buf-string-with-overlay-positions)
+                   "line1
 (l)ine2 // (CHECK) :1 :2 S100:message
 // COMMENT message
 // SECONDARY :1 :2 id: message
@@ -1042,12 +1047,15 @@ ag(e)'
 // (EDIT) fix-id -:3 -:4 `l1\\
 l2\\
 l3'
-line11")))
+line11"))
     (dotimes (_ 4)
       (previous-line))
     ;; the first highlighting must've been removed
+    (let ((highlight-faces (lit--collect-all-highlight-faces)))
+      (should (equal (length highlight-faces) 6))
+      (should (equal (length (cl-remove-duplicates highlight-faces)) 3)))
     (should (equal (lit--buf-string-with-overlay-positions)
-                     "line1
+                   "line1
 line2 // CHECK :1 :2 S100:message
 // COMMENT message
 (/)/ (SECONDARY) :1 :2 id: message
