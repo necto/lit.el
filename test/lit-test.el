@@ -856,24 +856,6 @@ line2")
                      "// bla-bla '+1:3 +1:5'
 line2")))))
 
-(ert-deftest lit--adjust-dumb-ranges-test ()
-  (with-temp-buffer
-    (insert "line1
-// CHECK +1:1 +1:2 S100:Message
-line2")
-    (lit--goto-line 2)
-    (end-of-line)
-    (let ((overlay-pairs (lit--make-all-dumb-range-spec-overlays))
-          (inserted-begin (point)))
-      (insert "
-line2.5")
-      (lit--adjust-range-specs-after-insertion overlay-pairs inserted-begin (point)))
-    (should (equal (buffer-string)
-                   "line1
-// CHECK +2:1 +2:2 S100:Message
-line2.5
-line2"))))
-
 (ert-deftest lit--add-locs-to-hashtable-test ()
   (let ((ht (make-hash-table)))
     (lit--add-locs-to-hashtable '() ht)

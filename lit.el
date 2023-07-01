@@ -376,16 +376,6 @@ Return nil otherwise."
         (forward-line))
       overlay-pairs)))
 
-(defun lit--overlay-pair-affected-p (overlay-pair inserted-begin inserted-end)
-  "Is the spec-target pair of overlays affacted by the insertion."
-  (let ((spec-begin (overlay-start (car overlay-pair)))
-        (target-begin (overlay-start (cdr overlay-pair)))
-        (target-end (overlay-end (cdr overlay-pair))))
-    (or (< spec-begin inserted-begin target-end)
-        (< spec-begin inserted-end target-end)
-        (< target-begin inserted-begin spec-begin)
-        (< target-begin inserted-end spec-begin))))
-
 (defun lit--column-number-at-pos (pos)
   (save-excursion
     (goto-char pos)
@@ -412,13 +402,6 @@ Return nil otherwise."
          (target-end (overlay-end (cdr overlay-pair)))
          (new-spec (lit--render-dumb-spec spec-line target-begin target-end)))
       (replace-region-contents spec-begin spec-end (lambda () new-spec))))
-
-(defun lit--adjust-range-specs-after-insertion (overlay-pairs inserted-begin inserted-end)
-  "Adjust all affected non-smart specs after an insertion."
-  (mapc #'lit--rewrite-spec-for-pair
-        (seq-filter (lambda (pair)
-                      (lit--overlay-pair-affected-p pair inserted-begin inserted-end))
-                    overlay-pairs)))
 
 (defun lit--make-overlay-covering-lines-of (target-overlay)
   "Make another overlay that covers entire lines and the TARGET-OVERLAY."
