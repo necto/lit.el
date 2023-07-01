@@ -1025,14 +1025,14 @@ age'
 // EDIT fix-id -:3 -:4 `l1\\
 l2\\
 l3'
-line11"))
-      (search-forward "age'")
-      (next-line) ; intentionally call interactive function
-      (let ((hl-overlays (overlays-in (point-min) (point-max)))))
+line11")))
+    (search-forward "age'")
+    (next-line) ; intentionally call interactive function
+    (let ((hl-overlays (overlays-in (point-min) (point-max))))
       (dolist (overlay hl-overlays)
-        (should-not (equal (overlay-get overlay 'face) nil))))
-    (should (equal (lit--buf-string-with-overlay-positions)
-                   "line1
+        (should-not (equal (overlay-get overlay 'face) nil)))
+      (should (equal (lit--buf-string-with-overlay-positions)
+                     "line1
 (l)ine2 // (CHECK) :1 :2 S100:message
 // COMMENT message
 // SECONDARY :1 :2 id: message
@@ -1042,7 +1042,7 @@ ag(e)'
 // (EDIT) fix-id -:3 -:4 `l1\\
 l2\\
 l3'
-line11"))))
+line11")))))
 
 (provide 'lit-test)
 
