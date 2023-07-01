@@ -1,4 +1,88 @@
 
 * lit.el - a mode facilitating the work with lit-tester specifications
 
+[[[[https://coveralls.io/repos/github/necto/lit.el/badge.svg]]][coverage]]
+
 [[https://coveralls.io/repos/github/necto/lit.el/badge.svg]]
+
+This repository contains a utility Emacs package for browsing and manipulating tests enriched with lit-tester annotations.
+
+** Installation
+
+You can install lit.el in your [[https://github.com/doomemacs/doomemacs][Doom Emacs']] packages.el, with this recipe:
+
+#+begin_src lisp
+(package! lit :recipe (:host github :repo "necto/lit.el"))
+#+end_src
+
+You should then bound the hotkeys in your config.el to simplify activation of the lit.el interactive functions.
+For example, I use the prefix `SPC l`:
+#+begin_src lisp
+(after! lit
+  (map! :leader :desc "Delete lit-tester spec comment" :mode lit-mode "l d" #'lit-delete-spec)
+  (map! :leader :desc "Insert issue spec comments" :mode lit-mode "l i" #'lit-insert-issues)
+  (map! :leader :desc "Run current lit test" :mode lit-mode "l r" #'lit-run-tester)
+  (map! :leader :desc "Insert issues from last run" :mode lit-mode "l e" #'lit-insert-issues-from-run))
+#+end_src
+
+See [[file:docker.emacs.d/init.el]] for an example of non-Doom-specific installation.
+
+If you do not use Emacs but you have Docker installed on your machine,
+you can use this package in a simplified mode by running [[file:lit-edit.sh]] like this:
+#+begin_src shell
+<path-to-lit.el>/lit-edit.sh path-to/YourLitTestFile.cpp
+#+end_src
+
+Simplified mode supports highlighting of target ranges and deletion/insertion of annotation comments
+but it does not support running lit from Emacs (because it is a pain to mount all the necessary folders inside of Docker container).
+
+See <<Simplified Mode>>
+
+** Use in your Emacs
+
+The package defines `lit-mode` that allows you to highlight the target regions
+for the specification in the current line.
+
+It also defines the following interactive functions:
+
+- `lit-delete-spec` - remove the specification comment from current line, or from the selection.
+- `lit-insert-issues` - query you for the part of a lit-tester output that
+  describes the "unexpected" issues and insert them interactively one after
+  another, with optional secondary locations, data flows, and fixes.
+- `lit-run-tester` - run lit on the current file and display the result in
+  another window. The displayed result is interactive. If you switch to the
+  result window and move to any "unexpected" issue, it will highlight the target
+  range in your original buffer.
+- `lit-insert-issues-from-run` - insert the "unexpected" issues reported by the
+  last lit run.
+
+** Simplified Mode
+
+In the simplified mode you only need Docker to run this package. To visualize
+the lit test and take advantage of highlighting, run:
+
+#+begin_src shell
+./lit.el/lit-edit.sh my-repo/test/checks/YourLitTestFile.cpp
+#+end_src
+
+In the opened Emacs window, you can use the default Emacs keybindings to
+navigate the file:
+
+- `up` / `down` arrows to move between the lines
+- `shift` key (+arrows keys) to select multiple lines
+- `Ctrl-x` followed by `Ctrl-s` to save the file
+- `Ctrl-x` followed by `Ctrl-c` to exit (if you modified the file, you'll be
+  prompted to save it)
+- `Ctrl-/` to undo last modification
+- `Ctrl-g` to cancel current action, or incomplete key combination
+
+Additionally, two keys allow you to do lit-specific edits:
+
+- `Ctrl-c` followed by `d` to delete the lit annotation on current line. If
+  multiple lines are selected, delete lit annotations from all of them.
+- `Ctrl-c` followed by `i` to insert lit annotations. You will be prompted to
+  paste the "unexpected" portion of the lit tester output. Run lit in another
+  terminal, select the printed output (only the "unexpected" issues), and paste
+  it to the input section using `Shift-Insert`. Then follow the prompts,
+  selecting the optional secondary locations, data flows, fixes, flow and fix
+  ids, and relative locations of the specification comments to be inserted.
