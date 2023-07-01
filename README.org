@@ -1,8 +1,6 @@
 
 * lit.el - a mode facilitating the work with lit-tester specifications
 
-[[[[https://coveralls.io/repos/github/necto/lit.el/badge.svg]]][coverage]]
-
 [[https://coveralls.io/repos/github/necto/lit.el/badge.svg]]
 
 This repository contains a utility Emacs package for browsing and manipulating tests enriched with lit-tester annotations.
@@ -15,8 +13,8 @@ You can install lit.el in your [[https://github.com/doomemacs/doomemacs][Doom Em
 (package! lit :recipe (:host github :repo "necto/lit.el"))
 #+end_src
 
-You should then bound the hotkeys in your config.el to simplify activation of the lit.el interactive functions.
-For example, I use the prefix `SPC l`:
+You should then bind the hotkeys in your config.el to simplify the activation of
+the lit.el interactive functions. For example, I use the prefix `SPC l`:
 #+begin_src lisp
 (after! lit
   (map! :leader :desc "Delete lit-tester spec comment" :mode lit-mode "l d" #'lit-delete-spec)
@@ -25,7 +23,15 @@ For example, I use the prefix `SPC l`:
   (map! :leader :desc "Insert issues from last run" :mode lit-mode "l e" #'lit-insert-issues-from-run))
 #+end_src
 
-See [[file:docker.emacs.d/init.el]] for an example of non-Doom-specific installation.
+It is also useful to automatically activate the `lit` mode for files with lit
+specifications. Assuming all of them are situated in the same directory, you can
+add the following ".dir-locals.el" file to this directory:
+
+#+begin_src lisp
+((prog-mode . ((mode . lit))))
+#+end_src
+
+See [[file:docker.emacs.d/init.el]] for an example of a non-Doom-specific installation.
 
 If you do not use Emacs but you have Docker installed on your machine,
 you can use this package in a simplified mode by running [[file:lit-edit.sh]] like this:
@@ -33,10 +39,12 @@ you can use this package in a simplified mode by running [[file:lit-edit.sh]] li
 <path-to-lit.el>/lit-edit.sh path-to/YourLitTestFile.cpp
 #+end_src
 
-Simplified mode supports highlighting of target ranges and deletion/insertion of annotation comments
-but it does not support running lit from Emacs (because it is a pain to mount all the necessary folders inside of Docker container).
+The simplified mode supports highlighting of target ranges and
+deletion/insertion of annotation comments but it does not support running lit
+from Emacs (because it is a pain to mount all the necessary folders inside of
+the Docker container).
 
-See <<Simplified Mode>>
+See [[Simplified Mode]].
 
 ** Use in your Emacs
 
@@ -45,7 +53,8 @@ for the specification in the current line.
 
 It also defines the following interactive functions:
 
-- `lit-delete-spec` - remove the specification comment from current line, or from the selection.
+- `lit-delete-spec` - remove the specification comment from the current line, or
+  from the selection.
 - `lit-insert-issues` - query you for the part of a lit-tester output that
   describes the "unexpected" issues and insert them interactively one after
   another, with optional secondary locations, data flows, and fixes.
@@ -78,7 +87,7 @@ navigate the file:
 
 Additionally, two keys allow you to do lit-specific edits:
 
-- `Ctrl-c` followed by `d` to delete the lit annotation on current line. If
+- `Ctrl-c` followed by `d` to delete the lit annotation on the current line. If
   multiple lines are selected, delete lit annotations from all of them.
 - `Ctrl-c` followed by `i` to insert lit annotations. You will be prompted to
   paste the "unexpected" portion of the lit tester output. Run lit in another
