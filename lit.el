@@ -122,9 +122,8 @@ One color per highlighted range."
   (when (overlayp hl)
     (delete-overlay hl)))
 
-(defun lit--remove-old-hl (&optional max-hls)
+(defun lit--remove-old-hl (max-hls)
   "Remove and deactivate all old highlights. Keep MAX-HLS newest highlights."
-  (unless max-hls (setq max-hls (length (lit--highlight-faces))))
   (let ((oldest (reverse lit--highlights)))
     (dolist (highlight-pair (butlast oldest max-hls))
       (let ((target-hl (car highlight-pair))
