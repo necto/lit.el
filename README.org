@@ -44,27 +44,6 @@ deletion/insertion of annotation comments but it does not support running lit
 from Emacs (because it is a pain to mount all the necessary folders inside of
 the Docker container).
 
-See [[Simplified Mode]].
-
-** Use in your Emacs
-
-The package defines `lit-mode` that allows you to highlight the target regions
-for the specification in the current line.
-
-It also defines the following interactive functions:
-
-- `lit-delete-spec` - remove the specification comment from the current line, or
-  from the selection.
-- `lit-insert-issues` - query you for the part of a lit-tester output that
-  describes the "unexpected" issues and insert them interactively one after
-  another, with optional secondary locations, data flows, and fixes.
-- `lit-run-tester` - run lit on the current file and display the result in
-  another window. The displayed result is interactive. If you switch to the
-  result window and move to any "unexpected" issue, it will highlight the target
-  range in your original buffer.
-- `lit-insert-issues-from-run` - insert the "unexpected" issues reported by the
-  last lit run.
-
 ** Simplified Mode
 
 In the simplified mode you only need Docker to run this package. To visualize
@@ -77,21 +56,40 @@ the lit test and take advantage of highlighting, run:
 In the opened Emacs window, you can use the default Emacs keybindings to
 navigate the file:
 
-- `up` / `down` arrows to move between the lines
-- `shift` key (+arrows keys) to select multiple lines
-- `Ctrl-x` followed by `Ctrl-s` to save the file
-- `Ctrl-x` followed by `Ctrl-c` to exit (if you modified the file, you'll be
+- =up= / =down= arrows to move between the lines
+- =shift= key (+arrows keys) to select multiple lines
+- =Ctrl-x= followed by =Ctrl-s= to save the file
+- =Ctrl-x= followed by =Ctrl-c= to exit (if you modified the file, you'll be
   prompted to save it)
-- `Ctrl-/` to undo last modification
-- `Ctrl-g` to cancel current action, or incomplete key combination
+- =Ctrl-/= to undo last modification
+- =Ctrl-g= to cancel current action, or incomplete key combination
 
 Additionally, two keys allow you to do lit-specific edits:
 
-- `Ctrl-c` followed by `d` to delete the lit annotation on the current line. If
+- =Ctrl-c= followed by =d= to delete the lit annotation on the current line. If
   multiple lines are selected, delete lit annotations from all of them.
-- `Ctrl-c` followed by `i` to insert lit annotations. You will be prompted to
+- =Ctrl-c= followed by =i= to insert lit annotations. You will be prompted to
   paste the "unexpected" portion of the lit tester output. Run lit in another
   terminal, select the printed output (only the "unexpected" issues), and paste
-  it to the input section using `Shift-Insert`. Then follow the prompts,
+  it to the input section using =Shift-Insert=. Then follow the prompts,
   selecting the optional secondary locations, data flows, fixes, flow and fix
   ids, and relative locations of the specification comments to be inserted.
+
+** Use in your Emacs
+
+The package defines =lit-mode= that allows you to highlight the target regions
+for the specification in the current line.
+
+It also defines the following interactive functions:
+
+- =lit-delete-spec= - remove the specification comment from the current line, or
+  from the selection.
+- =lit-insert-issues= - query you for the part of a lit-tester output that
+  describes the "unexpected" issues and insert them interactively one after
+  another, with optional secondary locations, data flows, and fixes.
+- =lit-run-tester= - run lit on the current file and display the result in
+  another window. The displayed result is interactive. If you switch to the
+  result window and move to any "unexpected" issue, it will highlight the target
+  range in your original buffer.
+- =lit-insert-issues-from-run= - insert the "unexpected" issues reported by the
+  last lit run.
