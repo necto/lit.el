@@ -998,7 +998,11 @@ line2")))))
     (should (equal (gethash 5 ht) (gethash 8 ht)))
     (should (equal (gethash 5 ht) "another beast"))
     (should (equal (gethash 50 ht) (gethash 80 ht)))
-    (should (equal (gethash 50 ht) 42))))
+    (should (equal (gethash 50 ht) 42))
+    (lit--map-headers-to-primary-loc
+     '((:fixes ((:pos-in-list 18)) :primary "fix-prim"))
+     ht)
+    (should (equal (gethash 18 ht) "fix-prim"))))
 
 (ert-deftest lit--make-hashtable-header-line-to-dependants ()
   (let ((ht (lit--make-hashtable-header-line-to-dependants
