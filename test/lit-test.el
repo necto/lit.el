@@ -249,18 +249,21 @@ line 4
             '( :file "file.c" :rule-id "S100"
                :primary ( :begin (:line 3 :col 3) :end (:line 3 :col 21) :message "Prim")
                :secondaries (( :begin (:line 2 :col 3) :end (:line 2 :col 5) :message "Sec"))
-               :dataflows (( :description "Description 1" :steps ())
-                           ( :description "Description 2" :steps ()))
-               :fixes ())
+               :dataflows (( :description "Description 1" :steps ()))
+               :fixes
+               ((:description "F1"
+                 :edits ((:begin (:line 4 :col 3) :end (:line 4 :col 4)
+                          :message "bread")))))
             "next")
            "
 line 2
 // SECONDARY -:3 -:5 issue-id:Sec
 line 3
-// CHECK -:3 -:21 S100(issue-id,df-id,df-id):Prim
-// DATAFLOW DESCRIPTION df-id:Description 2
+// CHECK -:3 -:21 S100(issue-id,df-id):Prim
+// FIX fix-id1:F1
 // DATAFLOW DESCRIPTION df-id:Description 1
 line 4
+// EDIT fix-id1 -:3 -:4 `bread`
 ")))
 
 (defun lit-test-insert-issue-with-2-secs-on-lines (sec-line1 sec-line2)
