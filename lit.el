@@ -1054,9 +1054,9 @@ region."
   :type 'file)
 
 (defun lit-parse-full-report (report)
-  (let* ((unexpected-start (string-match "[0-9]+ unexpected in .* mode:\n" report))
+  (let* ((unexpected-start (string-match "^.*[0-9]+ unexpected in .* mode:\n" report))
          (unexpected-end (match-end 0))
-         (missing-start (string-match "[0-9]+ missing in .* mode:\n" report))
+         (missing-start (string-match "^.*[0-9]+ missing in .* mode:\n" report))
          (missing-end (match-end 0)))
     (if unexpected-start
         `(:expected-header ,(substring report 0 unexpected-start)
@@ -1073,7 +1073,8 @@ region."
 
 (defun lit--cut-and-parse-lit-output (lit-output)
   (if-let* ((report-start (string-match "[0-9]+ expected messages" lit-output))
-            (report-end (string-match "error: command failed with exit status" lit-output))
+            (report-end (or (string-match "^.*`---------------" lit-output)
+                            (string-match "^.*error: command failed with exit status" lit-output)))
             (preamble (substring lit-output 0 report-start))
             (full-report (substring lit-output report-start report-end))
             (postamble (substring lit-output report-end)))
