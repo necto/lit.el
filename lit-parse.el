@@ -266,7 +266,8 @@ splitting points and cuts the list into three."
 (defun lit-parse--1-observed (observed-report)
   "Parse a single observed issue report as printed by tester."
   (let ((lines (lit-parse--join-multilines (split-string observed-report "\n" t))))
-    (if-let* ((filename-with-rest-of-line (lit-parse--match-filename (car lines)))
+    (if-let* ((first-line (car lines))
+              (filename-with-rest-of-line (lit-parse--match-filename first-line))
               (filename (string-trim-left filename-with-rest-of-line))
               (primary-spec (lit-parse--primary-spec (cadr lines))))
         (cl-destructuring-bind (secondary-specs dataflow-specs fix-specs)
@@ -283,7 +284,6 @@ splitting points and cuts the list into three."
                :secondaries ,(mapcar (lambda (secondary) (plist-get secondary :secondary)) secondaries)
                :dataflows ,dataflows
                :fixes ,fixes)))
-      (print "failed")
       nil)))
 
 (defun lit-parse--chop-string (string separator)
@@ -303,9 +303,22 @@ Modifies MATCH DATA."
         (cdr result)
       result)))
 
+(defun lit-parse--skip-non-actionable-lines (str)
+  "Skip the lines in STR that contain no issue difference spec.
+
+For example the \"1 unexpected in ... mode\".
+Returns the rest of the string."
+  (let ((lines (split-string str "\n" t)))
+    (string-join
+     (seq-drop-while
+      (lambda (line)
+        (or (string-empty-p line)))
+      lines) "\n")))
+
 (defun lit-parse-all-observed (observed-multiisue-report)
   "Parse the observed report of multiple issues as printed by tester."
-  (let* ((observed-single-reports (lit-parse--chop-string observed-multiisue-report lit-parse--tester-filename-regex))
+  (let* ((rep-minus-header (lit-parse--skip-non-actionable-lines observed-multiisue-report))
+         (observed-single-reports (lit-parse--chop-string rep-minus-header lit-parse--tester-filename-regex))
          (issue-specs (mapcar #'lit-parse--1-observed observed-single-reports)))
     ;; Make sure all issues parsed
     (dolist (issue-spec issue-specs)
