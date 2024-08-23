@@ -310,17 +310,31 @@ For example the \"1 unexpected in ... mode\".
 Returns the rest of the string."
   (let ((lines (split-string str "\n" t)))
     (string-join
-     (seq-drop-while
+     (seq-filter
       (lambda (line)
-        (or (string-empty-p line)
-            (string-match-p "[0-9]+ unexpected in .* mode:" line)
-            (string-match-p "[0-9]+ expected messages" line)))
+        (not (or (string-empty-p line)
+                 (string-match-p "[0-9]+ unexpected in .* mode:" line)
+                 (string-match-p "[0-9]+ expected messages" line)
+                 (string-match-p "---command stdout---" line)
+                 (string-match-p "--------------------" line))))
       lines) "\n")))
+
+(defun lit-parse--drop-lit-line-prefix-decor (str)
+  "Drop the prefix of each line in STR that is added by lit tool."
+  (let ((lines (split-string str "\n" t)))
+    (string-join
+     (mapcar (lambda (line)
+               (if (string-match "# | " line)
+                   (substring line 4)
+                 line))
+             lines) "\n")))
 
 (defun lit-parse-all-observed (observed-multiisue-report)
   "Parse the observed report of multiple issues as printed by tester."
-  (let* ((rep-minus-header (lit-parse--skip-non-actionable-lines observed-multiisue-report))
-         (observed-single-reports (lit-parse--chop-string rep-minus-header lit-parse--tester-filename-regex))
+  (let* ((pure-rep (lit-parse--skip-non-actionable-lines
+                    (lit-parse--drop-lit-line-prefix-decor
+                     observed-multiisue-report)) )
+         (observed-single-reports (lit-parse--chop-string pure-rep lit-parse--tester-filename-regex))
          (issue-specs (mapcar #'lit-parse--1-observed observed-single-reports)))
     ;; Make sure all issues parsed
     (dolist (issue-spec issue-specs)

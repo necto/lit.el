@@ -289,6 +289,48 @@ using E2Ref = E2 &`
         :dataflows ()
         :fixes ())))))
 
+(ert-deftest lit-parse-all-observed-skips-lit-decorations ()
+  (should
+   (equal
+    (lit-parse-all-observed
+     "
+# .---command stdout------------
+# | 24 expected messages
+# | 1 unexpected in [cpp23] mode:
+# |   /just/file.cpp
+# |     16:5 16:29 S5782:primary message
+# |       /just/file.cpp:    15:7 15:20:Assuming the condition
+# |       /just/file.cpp:    15:3 15:5:Taking true branch
+# |       /just/file.cpp:    16:5 16:29:some duplicate message
+# |       2 data flows:
+# |         // DATAFLOW DESCRIPTION:DF descr 1
+# |           /just/file.cpp:    16:22 16:28:This size argument overflows the buffer
+# |           /just/file.cpp:    15:7 15:20:Assuming sizep >= 1025
+# |           /just/file.cpp:    14:16 14:26:Using sizep declared here
+# |         // DATAFLOW DESCRIPTION:DF descr 2
+# |           /just/file.cpp:    16:14 16:20:This buffer access overflows
+# |           /just/file.cpp:    12:1 12:26:Using buffer declared here
+# `-----------------------------
+")
+    (lit-parse-all-observed
+     "
+24 expected messages
+1 unexpected in [cpp23] mode:
+  /just/file.cpp
+    16:5 16:29 S5782:primary message
+      /just/file.cpp:    15:7 15:20:Assuming the condition
+      /just/file.cpp:    15:3 15:5:Taking true branch
+      /just/file.cpp:    16:5 16:29:some duplicate message
+      2 data flows:
+        // DATAFLOW DESCRIPTION:DF descr 1
+          /just/file.cpp:    16:22 16:28:This size argument overflows the buffer
+          /just/file.cpp:    15:7 15:20:Assuming sizep >= 1025
+          /just/file.cpp:    14:16 14:26:Using sizep declared here
+        // DATAFLOW DESCRIPTION:DF descr 2
+          /just/file.cpp:    16:14 16:20:This buffer access overflows
+          /just/file.cpp:    12:1 12:26:Using buffer declared here
+"))))
+
 (provide 'lit-parse-test)
 
 ;;; lit-parse-test.el ends here
