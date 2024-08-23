@@ -312,7 +312,9 @@ Returns the rest of the string."
     (string-join
      (seq-drop-while
       (lambda (line)
-        (or (string-empty-p line)))
+        (or (string-empty-p line)
+            (string-match-p "[0-9]+ unexpected in .* mode:" line)
+            (string-match-p "[0-9]+ expected messages" line)))
       lines) "\n")))
 
 (defun lit-parse-all-observed (observed-multiisue-report)

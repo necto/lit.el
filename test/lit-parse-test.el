@@ -271,6 +271,24 @@ using E2Ref = E2 &`
         :secondaries ()
         :dataflows ()
         :fixes ())))))
+
+(ert-deftest lit-parse-all-observed-skips-summary-headers ()
+  (should
+   (equal
+    (lit-parse-all-observed
+     "
+24 expected messages
+1 unexpected in [cpp23] mode:
+  /p/to/f.cpp
+    67:3 67:22 S946:Address of stack memory associated with temporary object of type 'B' returned to caller")
+    '(( :file "/p/to/f.cpp"
+        :rule-id "S946"
+        :primary ( :begin (:line 67 :col 3) :end (:line 67 :col 22)
+                          :message "Address of stack memory associated with temporary object of type 'B' returned to caller")
+        :secondaries ()
+        :dataflows ()
+        :fixes ())))))
+
 (provide 'lit-parse-test)
 
 ;;; lit-parse-test.el ends here
