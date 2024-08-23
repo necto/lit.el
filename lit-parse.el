@@ -266,8 +266,9 @@ splitting points and cuts the list into three."
 (defun lit-parse--1-observed (observed-report)
   "Parse a single observed issue report as printed by tester."
   (let ((lines (lit-parse--join-multilines (split-string observed-report "\n" t))))
-    (if-let ((filename (string-trim-left (lit-parse--match-filename (car lines))))
-             (primary-spec (lit-parse--primary-spec (cadr lines))))
+    (if-let* ((filename-with-rest-of-line (lit-parse--match-filename (car lines)))
+              (filename (string-trim-left filename-with-rest-of-line))
+              (primary-spec (lit-parse--primary-spec (cadr lines))))
         (cl-destructuring-bind (secondary-specs dataflow-specs fix-specs)
             (lit-parse--split-into-secondary-dataflow-fix-specs (cddr lines))
           (let ((secondaries (mapcar #'lit-parse--secondary-spec secondary-specs))
@@ -307,7 +308,9 @@ Modifies MATCH DATA."
   (let* ((observed-single-reports (lit-parse--chop-string observed-multiisue-report lit-parse--tester-filename-regex))
          (issue-specs (mapcar #'lit-parse--1-observed observed-single-reports)))
     ;; Make sure all issues parsed
-    (dolist (issue-spec issue-specs) (cl-assert issue-spec))
+    (dolist (issue-spec issue-specs)
+      (when (null issue-spec)
+        (error "Failed to parse the observed spec")) )
     issue-specs))
 
 (provide 'lit-parse)
